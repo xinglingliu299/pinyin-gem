@@ -24,6 +24,9 @@
       },
       "package": "com.pinyin.magicprincess"
     },
+    "experiments": {
+      "baseUrl": "/pinyin-gem"
+    },
     "plugins": [
       "expo-router"
     ],
