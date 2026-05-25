@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "拼音魔法公主",
+    "slug": "pinyin-magic-princess",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "pinyin-magic",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF5FF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pinyin.magicprincess"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FAF5FF"
+      },
+      "package": "com.pinyin.magicprincess"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "fonts": [
+      {
+        "src": "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2",
+        "fontFamily": "Inter",
+        "fontWeight": "300"
+      },
+      {
+        "src": "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fAZ9hiJ-Ek-_EeA.woff2",
+        "fontFamily": "Inter",
+        "fontWeight": "400"
+      },
+      {
+        "src": "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2",
+        "fontFamily": "Inter",
+        "fontWeight": "500"
+      }
+    ]
+  }
+}
