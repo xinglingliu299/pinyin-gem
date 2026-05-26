@@ -1,6 +1,6 @@
-// Step 2 - 口型模仿 - 简洁清晰的口型展示
+// Step 2 - 口型模仿 - 含前置摄像头镜像 + 口型动画演示
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { PrimaryButton, LearnTopBar } from '@/components';
@@ -8,37 +8,35 @@ import { getLevelById } from '@/data/curriculum';
 import { useResponsive } from '@/hooks/useResponsive';
 import { playPinyin } from '@/services/audio';
 
-// 口型数据映射：根据 mouthGuide 文字返回具体形状参数
+// 口型数据映射
 type MouthConfig = {
   label: string;
-  width: number;     // 口型宽度比例
-  height: number;    // 口型高度比例
-  roundness: number; // 圆角程度
-  desc: string;      // 一句话描述
+  width: number;
+  height: number;
+  roundness: number;
+  desc: string;
+  cameraHint: string; // 摄像头模式下的提示词
 };
 
 const MOUTH_SHAPES: Record<string, MouthConfig> = {
-  a:  { label: '嘴巴张大', width: 55, height: 42, roundness: 12, desc: '像医生检查喉咙说"啊"' },
-  o:  { label: '嘴巴圆圆', width: 40, height: 40, roundness: 20, desc: '像吹泡泡一样圆圆的' },
-  e:  { label: '嘴巴扁扁', width: 50, height: 20, roundness: 10, desc: '像微笑时嘴角往两边咧' },
-  i:  { label: '牙齿对齐', width: 36, height: 16, roundness: 8, desc: '牙齿对齐，像说"一"' },
-  u:  { label: '嘴巴凸起', width: 28, height: 28, roundness: 14, desc: '像吹蜡烛，嘴巴向前' },
-  ü:  { label: '嘴巴翘起', width: 26, height: 26, roundness: 13, desc: '像吹口哨，嘴巴噘起来' },
+  a:  { label: '嘴巴张大', width: 55, height: 42, roundness: 12, desc: '像医生检查喉咙说"啊"', cameraHint: '张开嘴巴，露出牙齿，舌头放平' },
+  o:  { label: '嘴巴圆圆', width: 40, height: 40, roundness: 20, desc: '像吹泡泡一样圆圆的', cameraHint: '嘴唇收圆，像含着一颗糖果' },
+  e:  { label: '嘴巴扁扁', width: 50, height: 20, roundness: 10, desc: '像微笑时嘴角往两边咧', cameraHint: '嘴角向两边咧开，嘴巴扁扁的' },
+  i:  { label: '牙齿对齐', width: 36, height: 16, roundness: 8, desc: '牙齿对齐，像说"一"', cameraHint: '上下牙齿轻轻对齐，嘴角咧开' },
+  u:  { label: '嘴巴凸起', width: 28, height: 28, roundness: 14, desc: '像吹蜡烛，嘴巴向前', cameraHint: '嘴唇向前凸起，像要吹灭蜡烛' },
+  ü: { label: '嘴巴翘起', width: 26, height: 26, roundness: 13, desc: '像吹口哨，嘴巴噘起来', cameraHint: '嘴巴噘起，像吹口哨的样子' },
 };
 
 function detectMouthConfig(letter: string, mouthGuide: string): MouthConfig {
-  // 先拿 letter 的首字母匹配
   const firstChar = letter.charAt(0).toLowerCase();
   if (MOUTH_SHAPES[firstChar]) return MOUTH_SHAPES[firstChar];
-  // 再根据 guide 文字判断
   if (mouthGuide.includes('张大')) return MOUTH_SHAPES['a'];
   if (mouthGuide.includes('圆圆') || mouthGuide.includes('收圆')) return MOUTH_SHAPES['o'];
   if (mouthGuide.includes('扁扁') || mouthGuide.includes('咧开')) return MOUTH_SHAPES['e'];
   if (mouthGuide.includes('对齐') || mouthGuide.includes('牙齿')) return MOUTH_SHAPES['i'];
   if (mouthGuide.includes('凸起') || mouthGuide.includes('向前') || mouthGuide.includes('吹蜡烛')) return MOUTH_SHAPES['u'];
   if (mouthGuide.includes('翘起') || mouthGuide.includes('吹口哨')) return MOUTH_SHAPES['ü'];
-  // 默认圆唇
-  return { label: '嘴巴圆圆的', width: 42, height: 42, roundness: 20, desc: '嘴唇收圆' };
+  return { label: '嘴巴圆圆的', width: 42, height: 42, roundness: 20, desc: '嘴唇收圆', cameraHint: '嘴唇收圆' };
 }
 
 // ---- 口型演示组件 ----
@@ -48,7 +46,6 @@ function MouthDemo({ config, playing }: { config: MouthConfig; playing: boolean 
 
   useEffect(() => {
     if (playing) {
-      // 张嘴动画
       const open = Animated.loop(
         Animated.sequence([
           Animated.timing(openAnim, {
@@ -62,7 +59,6 @@ function MouthDemo({ config, playing }: { config: MouthConfig; playing: boolean 
       open.start();
       return () => open.stop();
     }
-    // 不播放时轻微呼吸
     const breathe = Animated.loop(
       Animated.sequence([
         Animated.timing(breatheAnim, { toValue: 1.06, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -84,19 +80,15 @@ function MouthDemo({ config, playing }: { config: MouthConfig; playing: boolean 
 
   return (
     <Animated.View style={[demoStyles.faceCircle, { transform: [{ scale: breatheAnim }] }]}>
-      {/* 眼睛 */}
       <View style={[demoStyles.eye, { left: 38, top: 38 }]} />
       <View style={[demoStyles.eye, { right: 38, top: 38 }]} />
-      {/* 鼻子 */}
       <View style={demoStyles.nose} />
-      {/* 口型 */}
       <Animated.View style={[
         demoStyles.mouth,
         playing
           ? { width: mouthWidth, height: mouthHeight, borderRadius: config.roundness * 0.8 }
           : { width: config.width, height: config.height, borderRadius: config.roundness },
       ]} />
-      {/* 标签 */}
       <Text style={demoStyles.label}>{config.label}</Text>
     </Animated.View>
   );
@@ -131,44 +123,143 @@ const demoStyles = StyleSheet.create({
   },
 });
 
-// ---- 小镜子弹窗 ----
-function MirrorModal({ config, onClose }: { config: MouthConfig; onClose: () => void }) {
+// ---- 前置摄像头组件 ----
+function CameraMirror({ config, onClose }: { config: MouthConfig; onClose: () => void }) {
+  const videoRef = useRef<any>(null);
+  const containerRef = useRef<View>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1, duration: 300, useNativeDriver: true,
     }).start();
+
+    // 仅 Web 端使用前置摄像头
+    if (Platform.OS !== 'web') {
+      setCameraError('请使用手机/平板App体验摄像头功能');
+      return;
+    }
+
+    let stream: MediaStream | null = null;
+
+    const startCamera = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+
+        // 等待 DOM 渲染
+        setTimeout(() => {
+          const container = document.getElementById('camera-container');
+          if (container && stream) {
+            // 清空之前的视频元素
+            container.innerHTML = '';
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.objectFit = 'cover';
+            video.style.borderRadius = '20px';
+            video.style.transform = 'scaleX(-1)'; // 镜像
+            container.appendChild(video);
+            setCameraReady(true);
+          }
+        }, 100);
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError') {
+          setCameraError('需要摄像头权限才能使用小镜子功能，请在浏览器设置中允许访问摄像头');
+        } else if (err.name === 'NotFoundError') {
+          setCameraError('未检测到摄像头设备');
+        } else {
+          setCameraError('无法启动摄像头，请确认浏览器允许了摄像头权限');
+        }
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      // 清理视频元素
+      const container = document.getElementById('camera-container');
+      if (container) container.innerHTML = '';
+    };
   }, []);
 
   return (
     <Animated.View style={[mirrorStyles.overlay, { opacity: fadeAnim }]}>
       <TouchableOpacity style={mirrorStyles.backdrop} activeOpacity={1} onPress={onClose} />
       <View style={mirrorStyles.panel}>
-        <View style={mirrorStyles.mirrorFrame}>
-          <View style={mirrorStyles.mirrorGlass}>
-            {/* 镜面反射的脸 */}
-            <View style={mirrorStyles.mirrorFace}>
-              <View style={[mirrorStyles.mEye, { left: 38, top: 36 }]} />
-              <View style={[mirrorStyles.mEye, { right: 38, top: 36 }]} />
-              <View style={mirrorStyles.mNose} />
-              <View style={[mirrorStyles.mMouth, {
-                width: config.width * 0.85,
-                height: config.height * 0.85,
-                borderRadius: config.roundness * 0.85,
-              }]} />
-            </View>
-            {/* 高光 */}
-            <View style={mirrorStyles.glare} />
+        {/* 标题栏 */}
+        <View style={mirrorStyles.titleRow}>
+          <Text style={mirrorStyles.title}>🪞 魔法小镜子</Text>
+          <TouchableOpacity style={mirrorStyles.closeX} onPress={onClose}>
+            <Text style={mirrorStyles.closeXText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 摄像头区域 */}
+        <View style={mirrorStyles.cameraFrame}>
+          <View
+            id="camera-container"
+            style={mirrorStyles.cameraArea}
+            ref={containerRef as any}
+          >
+            {!cameraReady && !cameraError && (
+              <View style={mirrorStyles.loadingWrap}>
+                <Text style={mirrorStyles.loadingText}>正在打开摄像头...</Text>
+              </View>
+            )}
+            {cameraError && (
+              <View style={mirrorStyles.errorWrap}>
+                <Text style={mirrorStyles.errorEmoji}>📷</Text>
+                <Text style={mirrorStyles.errorText}>{cameraError}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* 当前口型小图参考（叠加在摄像头右上角） */}
+          <View style={mirrorStyles.refBadge}>
+            <Text style={mirrorStyles.refText}>{config.label}</Text>
           </View>
         </View>
-        <Text style={mirrorStyles.title}>🪞 魔法小镜子</Text>
-        <Text style={mirrorStyles.hint}>看看镜子里，{config.desc}</Text>
-        <View style={mirrorStyles.steps}>
-          <Text style={mirrorStyles.step}>① 看口型 → ② 记住它 → ③ 自己试</Text>
+
+        {/* 提示文字 */}
+        <View style={mirrorStyles.hintBox}>
+          <Text style={mirrorStyles.hintEmoji}>{'👄'}</Text>
+          <View style={mirrorStyles.hintContent}>
+            <Text style={mirrorStyles.hintTitle}>
+              跟着做口型：{config.label}
+            </Text>
+            <Text style={mirrorStyles.hintDesc}>
+              {config.cameraHint}
+            </Text>
+          </View>
         </View>
+
+        {/* 三步引导 */}
+        <View style={mirrorStyles.stepsRow}>
+          {['看口型示范', '对着镜子练', '检查嘴巴对不对'].map((step, i) => (
+            <View key={i} style={mirrorStyles.stepItem}>
+              <View style={mirrorStyles.stepNum}>
+                <Text style={mirrorStyles.stepNumText}>{i + 1}</Text>
+              </View>
+              <Text style={mirrorStyles.stepLabel}>{step}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* 关闭按钮 */}
         <TouchableOpacity style={mirrorStyles.closeBtn} onPress={onClose}>
-          <Text style={mirrorStyles.closeText}>收起小镜子</Text>
+          <Text style={mirrorStyles.closeBtnText}>收起小镜子</Text>
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -181,60 +272,107 @@ const mirrorStyles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)',
+    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)',
   },
   panel: {
     backgroundColor: Colors.pureWhite, borderRadius: 28,
-    padding: 24, alignItems: 'center', gap: 16,
-    width: '85%', maxWidth: 360,
+    padding: 20, alignItems: 'center', gap: 14,
+    width: '92%', maxWidth: 400,
     shadowColor: 'rgba(140,92,245,0.20)',
     shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 24, elevation: 10,
   },
-  mirrorFrame: {
-    borderRadius: 24, padding: 6,
-    backgroundColor: '#C8B8E8',
-  },
-  mirrorGlass: {
-    width: 180, height: 180, borderRadius: 20,
-    backgroundColor: '#D0E0F5', position: 'relative',
-    overflow: 'hidden',
-  },
-  mirrorFace: {
-    width: 160, height: 160, borderRadius: 80,
-    backgroundColor: '#FFF5EE',
-    alignSelf: 'center', marginTop: 10,
-    alignItems: 'center',
-  },
-  mEye: {
-    position: 'absolute', width: 14, height: 14, borderRadius: 7, backgroundColor: '#4477AA',
-  },
-  mNose: {
-    position: 'absolute', top: 60, width: 8, height: 6, borderRadius: 4, backgroundColor: '#A0B8D8',
-  },
-  mMouth: {
-    backgroundColor: '#C87A7A',
-    position: 'absolute', top: 88, opacity: 0.7,
-  },
-  glare: {
-    position: 'absolute', top: 6, right: 6,
-    width: 60, height: 40, backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 30, transform: [{ rotate: '-25deg' }],
+  titleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%',
   },
   title: {
     fontFamily: FontFamily.primary, fontSize: 20, fontWeight: "800",
     color: Colors.magicPurple,
   },
-  hint: {
-    fontFamily: FontFamily.primary, fontSize: 15, color: Colors.textPrimary,
+  closeX: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: Colors.glowPurple,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  closeXText: {
+    fontSize: 14, fontWeight: "700", color: Colors.magicPurple,
+  },
+  cameraFrame: {
+    width: '100%',
+    borderRadius: 24,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  cameraArea: {
+    width: '100%',
+    height: 260,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 20,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingWrap: {
+    alignItems: 'center', gap: 8,
+  },
+  loadingText: {
+    fontFamily: FontFamily.primary, fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  errorWrap: {
+    alignItems: 'center', gap: 8, paddingHorizontal: 24,
+  },
+  errorEmoji: { fontSize: 36 },
+  errorText: {
+    fontFamily: FontFamily.primary, fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
   },
-  steps: {
-    backgroundColor: Colors.glowPurple, borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 8,
+  refBadge: {
+    position: 'absolute', top: 12, right: 12,
+    backgroundColor: 'rgba(140,92,245,0.9)',
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 12,
   },
-  step: {
-    fontFamily: FontFamily.primary, fontSize: 14, fontWeight: "600",
+  refText: {
+    fontFamily: FontFamily.primary, fontSize: 13, fontWeight: "700",
+    color: Colors.pureWhite,
+  },
+  hintBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: Colors.glowPurple,
+    borderRadius: 16, padding: 14,
+    width: '100%',
+  },
+  hintEmoji: { fontSize: 28 },
+  hintContent: { flex: 1, gap: 2 },
+  hintTitle: {
+    fontFamily: FontFamily.primary, fontSize: 15, fontWeight: "700",
     color: Colors.magicPurple,
+  },
+  hintDesc: {
+    fontFamily: FontFamily.primary, fontSize: 13,
+    color: Colors.textPrimary, lineHeight: 18,
+  },
+  stepsRow: {
+    flexDirection: 'row', justifyContent: 'center', gap: 12,
+    width: '100%',
+  },
+  stepItem: {
+    alignItems: 'center', gap: 4, flex: 1,
+  },
+  stepNum: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: Colors.magicPurple,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepNumText: {
+    fontFamily: FontFamily.primary, fontSize: 12, fontWeight: "700",
+    color: Colors.pureWhite,
+  },
+  stepLabel: {
+    fontFamily: FontFamily.primary, fontSize: 11, fontWeight: "500",
+    color: Colors.textSecondary, textAlign: 'center',
   },
   closeBtn: {
     backgroundColor: Colors.magicPurple, borderRadius: 20,
@@ -242,7 +380,7 @@ const mirrorStyles = StyleSheet.create({
     shadowColor: 'rgba(140,92,245,0.25)',
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12, elevation: 4,
   },
-  closeText: {
+  closeBtnText: {
     fontFamily: FontFamily.primary, fontSize: 15, fontWeight: "600",
     color: Colors.pureWhite,
   },
@@ -281,7 +419,7 @@ export default function MouthPage() {
           像公主一样做口型
         </Text>
 
-        {/* 口型演示 */}
+        {/* 口型演示卡片 */}
         <View style={[styles.demoCard, { width: cardWidth }]}>
           <MouthDemo config={mouthConfig} playing={playing} />
 
@@ -317,16 +455,21 @@ export default function MouthPage() {
           </View>
         </View>
 
-        {/* 打开小镜子 */}
+        {/* 打开小镜子 - 前置摄像头 */}
         <TouchableOpacity
           style={[styles.mirrorBtn, { width: cardWidth }]}
           activeOpacity={0.8}
           onPress={() => setShowMirror(true)}
         >
-          <Text style={styles.mirrorEmoji}>🪞</Text>
-          <Text style={[styles.mirrorText, { fontSize: 16 * fontSizeMultiplier }]}>
-            打开小镜子，跟我做口型
-          </Text>
+          <Text style={styles.mirrorEmoji}>📸</Text>
+          <View style={styles.mirrorTextWrap}>
+            <Text style={[styles.mirrorTextMain, { fontSize: 16 * fontSizeMultiplier }]}>
+              打开小镜子，看我做口型
+            </Text>
+            <Text style={styles.mirrorTextSub}>
+              使用前置摄像头，看宝贝有没有跟着做
+            </Text>
+          </View>
         </TouchableOpacity>
 
         <Text style={styles.encourage}>
@@ -341,7 +484,7 @@ export default function MouthPage() {
       </ScrollView>
 
       {showMirror && (
-        <MirrorModal config={mouthConfig} onClose={() => setShowMirror(false)} />
+        <CameraMirror config={mouthConfig} onClose={() => setShowMirror(false)} />
       )}
     </View>
   );
@@ -401,15 +544,23 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   mirrorBtn: {
-    height: 56, backgroundColor: Colors.magicPurple, borderRadius: 28,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    height: 'auto',
+    backgroundColor: Colors.magicPurple, borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16, paddingHorizontal: 20,
     shadowColor: 'rgba(140,92,245,0.30)',
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12, elevation: 4,
   },
-  mirrorEmoji: { fontSize: 22 },
-  mirrorText: {
+  mirrorEmoji: { fontSize: 28 },
+  mirrorTextWrap: { flex: 1, gap: 2 },
+  mirrorTextMain: {
     fontFamily: FontFamily.primary, fontWeight: "600",
     color: Colors.pureWhite,
+  },
+  mirrorTextSub: {
+    fontFamily: FontFamily.primary, fontSize: 12, fontWeight: "400",
+    color: 'rgba(255,255,255,0.75)',
   },
   encourage: {
     fontFamily: FontFamily.primary, fontSize: 14, fontWeight: "500",
