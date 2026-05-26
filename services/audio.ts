@@ -1,7 +1,8 @@
 /**
  * 音频服务层
- * - 优先使用预生成的高质量音频文件（edge-tts / Microsoft Neural TTS）
- * - 回退到 expo-speech（Web Speech API）用于未预生成的文本
+ * - Web 端：优先使用预生成的高质量音频文件（edge-tts / Microsoft Neural TTS）
+ *   如果文件播放失败，自动回退到 Web Speech API (expo-speech)
+ * - 原生端：直接使用 expo-speech
  * - 录音：expo-av Audio.Recording（原生平台）
  */
 
@@ -41,9 +42,9 @@ const PINYIN_AUDIO_MAP: Record<string, string> = {
   'dē': 'pinyin_d', 'tē': 'pinyin_t', 'nē': 'pinyin_n', 'lē': 'pinyin_l',
   'gē': 'pinyin_g', 'kē': 'pinyin_k', 'hē': 'pinyin_h',
   'jī': 'pinyin_j', 'qī': 'pinyin_q', 'xī': 'pinyin_x',
-  'zhī': 'pinyin_zh', 'chī': 'pinyin_ch', 'shī': 'pinyin_sh', 'rì': 'pinyin_r',
-  'zī': 'pinyin_z', 'cī': 'pinyin_c', 'sī': 'pinyin_s',
-  'yī': 'pinyin_y', 'wū': 'pinyin_w',
+  'zhī': 'pinyin_zhi', 'chī': 'pinyin_chi', 'shī': 'pinyin_shi',
+  'rì': 'pinyin_ri', 'zī': 'pinyin_zi2', 'cī': 'pinyin_ci',
+  'sī': 'pinyin_si', 'yī': 'pinyin_yi', 'wū': 'pinyin_wu',
   // 第三阶段：复韵母+鼻韵母
   'āi': 'pinyin_ai', 'ēi': 'pinyin_ei', 'uī': 'pinyin_ui',
   'āo': 'pinyin_ao', 'ōu': 'pinyin_ou', 'iū': 'pinyin_iu',
@@ -85,17 +86,11 @@ const EXAMPLE_AUDIO_MAP: Record<string, string> = {
 
 // 声调森林的4声映射
 const TONE_AUDIO_MAP: Record<string, string> = {
-  // a 的四声
   'ā': 'tone_a1', 'á': 'tone_a2', 'ǎ': 'tone_a3', 'à': 'tone_a4',
-  // o 的四声
   'ō': 'tone_o1', 'ó': 'tone_o2', 'ǒ': 'tone_o3', 'ò': 'tone_o4',
-  // e 的四声
   'ē': 'tone_e1', 'é': 'tone_e2', 'ě': 'tone_e3', 'è': 'tone_e4',
-  // i 的四声
   'ī': 'tone_i1', 'í': 'tone_i2', 'ǐ': 'tone_i3', 'ì': 'tone_i4',
-  // u 的四声
   'ū': 'tone_u1', 'ú': 'tone_u2', 'ǔ': 'tone_u3', 'ù': 'tone_u4',
-  // ü 的四声
   'ǖ': 'tone_v1', 'ǘ': 'tone_v2', 'ǚ': 'tone_v3', 'ǜ': 'tone_v4',
 };
 
@@ -117,44 +112,82 @@ const FLASH_AUDIO_MAP: Record<string, string> = {
 
 /**
  * 获取音频文件路径
+ * 从当前页面 URL 自动推导 base path，不依赖任何全局变量
  */
-function getAudioUrl(audioKey: string): string | null {
-  // 获取基础路径（兼容 expo web baseUrl）
-  const base = typeof window !== 'undefined' && (window as any).__EXPO_BASE_URL
-    ? (window as any).__EXPO_BASE_URL
-    : '/pinyin-gem';
-  return `${base}/assets/audio/${audioKey}.mp3`;
+function getAudioUrl(audioKey: string): string {
+  try {
+    if (typeof window !== 'undefined') {
+      // 从当前 URL 路径推导 base path
+      // 例如 /pinyin-gem/learn/mouth -> /pinyin-gem
+      // 例如 /pinyin-gem -> /pinyin-gem
+      const pathname = window.location.pathname;
+      const segments = pathname.split('/').filter(Boolean);
+      if (segments.length >= 1 && segments[0] === 'pinyin-gem') {
+        return `/pinyin-gem/assets/audio/${audioKey}.mp3`;
+      }
+      return `/assets/audio/${audioKey}.mp3`;
+    }
+  } catch {
+    // ignore
+  }
+  return `/pinyin-gem/assets/audio/${audioKey}.mp3`;
 }
 
 /**
  * 通过 HTML5 Audio 播放音频文件
+ * @returns true 表示播放成功，false 表示失败
  */
-function playAudioFile(url: string): Promise<void> {
-  return new Promise<void>((resolve) => {
+function playAudioFile(url: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     try {
       // 停止当前播放
       if (currentAudio) {
         currentAudio.pause();
+        currentAudio.src = '';
         currentAudio = null;
       }
 
-      const audio = new Audio(url);
+      const audio = new Audio();
       currentAudio = audio;
 
+      // 设置加载超时
+      const timeout = setTimeout(() => {
+        console.warn('[audio] 加载超时:', url);
+        currentAudio = null;
+        resolve(false);
+      }, 8000);
+
+      audio.preload = 'auto';
+
+      audio.oncanplaythrough = () => {
+        clearTimeout(timeout);
+        audio.play().then(() => {
+          // 播放成功
+        }).catch((err) => {
+          console.warn('[audio] play() 被拒绝:', err.message);
+          currentAudio = null;
+          resolve(false);
+        });
+      };
+
+      audio.onerror = (e) => {
+        clearTimeout(timeout);
+        console.warn('[audio] 加载失败:', url, e);
+        currentAudio = null;
+        resolve(false);
+      };
+
       audio.onended = () => {
+        clearTimeout(timeout);
         currentAudio = null;
-        resolve();
+        resolve(true);
       };
-      audio.onerror = () => {
-        currentAudio = null;
-        resolve(); // 静默失败
-      };
-      audio.play().catch(() => {
-        currentAudio = null;
-        resolve(); // 静默失败
-      });
-    } catch {
-      resolve();
+
+      audio.src = url;
+      audio.load();
+    } catch (err) {
+      console.warn('[audio] 创建 Audio 失败:', err);
+      resolve(false);
     }
   });
 }
@@ -163,7 +196,6 @@ function playAudioFile(url: string): Promise<void> {
  * 查找文本对应的预生成音频 key
  */
 function findAudioKey(text: string): string | null {
-  // 依次在各个映射表中查找
   if (PINYIN_AUDIO_MAP[text]) return PINYIN_AUDIO_MAP[text];
   if (EXAMPLE_AUDIO_MAP[text]) return EXAMPLE_AUDIO_MAP[text];
   if (TONE_AUDIO_MAP[text]) return TONE_AUDIO_MAP[text];
@@ -175,35 +207,16 @@ function findAudioKey(text: string): string | null {
 // ---- TTS (Text-to-Speech) ----
 
 /**
- * 播放拼音发音
- * 优先使用预生成的高质量音频，回退到 expo-speech
+ * 使用 Web Speech API / expo-speech 播放文本
  */
-export async function playPinyin(
-  text: string,
-  options: PlayOptions = {},
-): Promise<void> {
-  const { language = 'zh-CN', rate = 0.5, pitch = 1.0 } = options;
-
-  // Web 端优先使用预生成音频
-  if (Platform.OS === 'web') {
-    const audioKey = findAudioKey(text);
-    if (audioKey) {
-      const url = getAudioUrl(audioKey);
-      if (url) {
-        await playAudioFile(url);
-        return;
-      }
-    }
-  }
-
-  // 回退到 expo-speech
+function speakWithTTS(text: string, options: PlayOptions): Promise<void> {
   return new Promise<void>((resolve) => {
     try {
       Speech.stop();
       Speech.speak(text, {
-        language,
-        rate,
-        pitch,
+        language: options.language || 'zh-CN',
+        rate: options.rate || 0.5,
+        pitch: options.pitch || 1.0,
         onDone: () => resolve(),
         onError: () => resolve(),
         onStopped: () => resolve(),
@@ -215,16 +228,39 @@ export async function playPinyin(
 }
 
 /**
+ * 播放拼音发音
+ * 优先使用预生成的高质量音频，失败自动回退到 expo-speech
+ */
+export async function playPinyin(
+  text: string,
+  options: PlayOptions = {},
+): Promise<void> {
+  const { language = 'zh-CN', rate = 0.5, pitch = 1.0 } = options;
+
+  // 尝试播放预生成音频文件（所有平台都尝试）
+  const audioKey = findAudioKey(text);
+  if (audioKey) {
+    const url = getAudioUrl(audioKey);
+    const success = await playAudioFile(url);
+    if (success) return; // 文件播放成功，直接返回
+    // 文件播放失败，继续回退到 TTS
+    console.log('[audio] 文件播放失败，回退到 TTS:', text);
+  }
+
+  // 回退到 expo-speech (Web Speech API)
+  await speakWithTTS(text, { language, rate, pitch });
+}
+
+/**
  * 停止当前朗读
  */
 export function stopSpeaking(): void {
   try {
-    // 停止音频文件播放
     if (currentAudio) {
       currentAudio.pause();
+      currentAudio.src = '';
       currentAudio = null;
     }
-    // 停止 TTS
     Speech.stop();
   } catch {
     // ignore

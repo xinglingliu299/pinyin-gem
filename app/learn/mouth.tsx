@@ -1,5 +1,5 @@
 // Step 2 - 口型模仿 - 含前置摄像头镜像 + 口型动画演示
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
@@ -15,7 +15,7 @@ type MouthConfig = {
   height: number;
   roundness: number;
   desc: string;
-  cameraHint: string; // 摄像头模式下的提示词
+  cameraHint: string;
 };
 
 const MOUTH_SHAPES: Record<string, MouthConfig> = {
@@ -125,59 +125,70 @@ const demoStyles = StyleSheet.create({
 
 // ---- 前置摄像头组件 ----
 function CameraMirror({ config, onClose }: { config: MouthConfig; onClose: () => void }) {
-  const videoRef = useRef<any>(null);
-  const containerRef = useRef<View>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const streamRef = useRef<MediaStream | null>(null);
+  // 用 ref 保存 DOM 元素引用，避免 React 协调冲突
+  const videoContainerRef = useCallback((node: any) => {
+    if (!node) return;
+    // React Native Web 的 View ref 拿到的是 DOM 元素
+    const domNode = node?._nativeTag !== undefined ? node : (node as unknown as HTMLElement);
+    // 直接操作 DOM 元素即可（React 不会干预 ref callback 内的操作）
+  }, []);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1, duration: 300, useNativeDriver: true,
     }).start();
 
-    // 仅 Web 端使用前置摄像头
     if (Platform.OS !== 'web') {
       setCameraError('请使用手机/平板App体验摄像头功能');
       return;
     }
 
-    let stream: MediaStream | null = null;
+    let cancelled = false;
 
     const startCamera = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
 
-        // 等待 DOM 渲染
-        setTimeout(() => {
-          const container = document.getElementById('camera-container');
+        if (cancelled) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+
+        // 等待 DOM 就绪后添加 video 元素
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          const container = document.getElementById('camera-video-container');
           if (container && stream) {
-            // 清空之前的视频元素
-            container.innerHTML = '';
             const video = document.createElement('video');
             video.srcObject = stream;
             video.autoplay = true;
             video.playsInline = true;
             video.muted = true;
-            video.style.width = '100%';
-            video.style.height = '100%';
-            video.style.objectFit = 'cover';
-            video.style.borderRadius = '20px';
-            video.style.transform = 'scaleX(-1)'; // 镜像
+            video.setAttribute('playsinline', '');
+            video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:20px;transform:scaleX(-1);';
+            // 标记为非 React 管理的 DOM 节点
+            video.setAttribute('data-mirror-video', 'true');
             container.appendChild(video);
             setCameraReady(true);
           }
-        }, 100);
+        });
       } catch (err: any) {
+        if (cancelled) return;
         if (err.name === 'NotAllowedError') {
           setCameraError('需要摄像头权限才能使用小镜子功能，请在浏览器设置中允许访问摄像头');
         } else if (err.name === 'NotFoundError') {
           setCameraError('未检测到摄像头设备');
         } else {
-          setCameraError('无法启动摄像头，请确认浏览器允许了摄像头权限');
+          setCameraError('无法启动摄像头：' + (err.message || '未知错误'));
         }
       }
     };
@@ -185,12 +196,22 @@ function CameraMirror({ config, onClose }: { config: MouthConfig; onClose: () =>
     startCamera();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      cancelled = true;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
-      // 清理视频元素
-      const container = document.getElementById('camera-container');
-      if (container) container.innerHTML = '';
+    };
+  }, []);
+
+  // 清理函数：组件卸载时移除 video 元素
+  useEffect(() => {
+    return () => {
+      const container = document.getElementById('camera-video-container');
+      if (container) {
+        const video = container.querySelector('[data-mirror-video]');
+        if (video) video.remove();
+      }
     };
   }, []);
 
@@ -206,12 +227,13 @@ function CameraMirror({ config, onClose }: { config: MouthConfig; onClose: () =>
           </TouchableOpacity>
         </View>
 
-        {/* 摄像头区域 */}
+        {/* 摄像头区域 - 用一个空的 div 作为 video 容器 */}
         <View style={mirrorStyles.cameraFrame}>
+          {/* @ts-ignore - React Native Web 支持原生 props */}
           <View
-            id="camera-container"
+            // @ts-ignore
+            nativeID="camera-video-container"
             style={mirrorStyles.cameraArea}
-            ref={containerRef as any}
           >
             {!cameraReady && !cameraError && (
               <View style={mirrorStyles.loadingWrap}>
