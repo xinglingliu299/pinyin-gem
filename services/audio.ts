@@ -149,38 +149,38 @@ function playAudioFile(url: string): Promise<boolean> {
 
       const audio = new Audio();
       currentAudio = audio;
+      let settled = false;
+
+      const done = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        if (!ok) currentAudio = null;
+        resolve(ok);
+      };
 
       // 设置加载超时
       const timeout = setTimeout(() => {
         console.warn('[audio] 加载超时:', url);
-        currentAudio = null;
-        resolve(false);
+        done(false);
       }, 8000);
 
-      audio.preload = 'auto';
+      audio.onerror = () => {
+        console.warn('[audio] 加载失败:', url);
+        done(false);
+      };
 
       audio.oncanplaythrough = () => {
-        clearTimeout(timeout);
         audio.play().then(() => {
-          // 播放成功
+          done(true); // 播放启动成功
         }).catch((err) => {
           console.warn('[audio] play() 被拒绝:', err.message);
-          currentAudio = null;
-          resolve(false);
+          done(false);
         });
       };
 
-      audio.onerror = (e) => {
-        clearTimeout(timeout);
-        console.warn('[audio] 加载失败:', url, e);
-        currentAudio = null;
-        resolve(false);
-      };
-
       audio.onended = () => {
-        clearTimeout(timeout);
         currentAudio = null;
-        resolve(true);
       };
 
       audio.src = url;
