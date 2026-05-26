@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { getStageLevelsWithIndex } from '@/data/curriculum';
 import { useProgress } from '@/services/progress';
-import { playPinyin } from '@/services/audio';
 import type { LevelData } from '@/data/types';
 
 // 韵母分组
@@ -17,13 +16,6 @@ const VOWEL_GROUPS = [
 export default function VowelGardenPage() {
   const levels = getStageLevelsWithIndex('vowel-garden');
   const { progress } = useProgress();
-  const [playingId, setPlayingId] = useState<string | null>(null);
-
-  const handlePlay = async (level: LevelData) => {
-    setPlayingId(level.id);
-    try { await playPinyin(level.pinyin, { rate: 0.4 }); } catch {}
-    setTimeout(() => setPlayingId(null), 2000);
-  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -48,7 +40,6 @@ export default function VowelGardenPage() {
           <View style={styles.grid}>
             {levels.slice(group.range[0], group.range[1] + 1).map((level) => {
               const isDone = progress.completedLevels.includes(level.id);
-              const isPlaying = playingId === level.id;
               const stars = progress.starRatings[level.id] || 0;
 
               return (
@@ -56,8 +47,7 @@ export default function VowelGardenPage() {
                   key={level.id}
                   style={[styles.card, isDone && styles.cardDone]}
                   activeOpacity={0.8}
-                  onPress={() => handlePlay(level)}
-                  onLongPress={() => router.push(`/learn/new-sound?id=${level.id}` as any)}
+                  onPress={() => router.push(`/learn/new-sound?id=${level.id}` as any)}
                 >
                   <View style={[styles.cardBadge, { backgroundColor: group.color + '20' }]}>
                     <Text style={[styles.cardLetter, { color: group.color }]}>{level.letter}</Text>
@@ -65,7 +55,6 @@ export default function VowelGardenPage() {
                   <Text style={styles.cardPinyin}>{level.pinyin}</Text>
                   <Text style={styles.cardWord}>{level.word}</Text>
 
-                  {isPlaying && <Text style={styles.playingBadge}>🔊</Text>}
                   {isDone && (
                     <Text style={styles.starBadge}>{'★'.repeat(stars)}</Text>
                   )}

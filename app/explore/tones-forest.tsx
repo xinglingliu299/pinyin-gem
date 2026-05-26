@@ -141,7 +141,7 @@ export default function TonesForestPage() {
 
             {/* 操作提示 */}
             <Text style={styles.cardHint}>
-              {isDone ? '长按重学' : '点击声调听发音 · 长按进入学习'}
+              {isDone ? '点击重学' : '点击声调听发音 · 点击字母进入学习'}
             </Text>
           </View>
         );

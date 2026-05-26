@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { getStageLevelsWithIndex } from '@/data/curriculum';
 import { useProgress } from '@/services/progress';
-import { playPinyin } from '@/services/audio';
 import type { LevelData } from '@/data/types';
 
 // 声母按发音部位分组
@@ -22,13 +21,6 @@ const CONSONANT_GROUPS = [
 export default function ConsonantCastlePage() {
   const levels = getStageLevelsWithIndex('consonant-castle');
   const { progress } = useProgress();
-  const [playingId, setPlayingId] = useState<string | null>(null);
-
-  const handlePlay = async (level: LevelData) => {
-    setPlayingId(level.id);
-    try { await playPinyin(level.pinyin, { rate: 0.4 }); } catch {}
-    setTimeout(() => setPlayingId(null), 2000);
-  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -54,7 +46,6 @@ export default function ConsonantCastlePage() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
             {levels.slice(group.range[0], group.range[1] + 1).map((level) => {
               const isDone = progress.completedLevels.includes(level.id);
-              const isPlaying = playingId === level.id;
               const stars = progress.starRatings[level.id] || 0;
 
               return (
@@ -62,8 +53,7 @@ export default function ConsonantCastlePage() {
                   key={level.id}
                   style={[styles.consCard, { borderColor: group.color + '40' }, isDone && styles.consCardDone]}
                   activeOpacity={0.8}
-                  onPress={() => handlePlay(level)}
-                  onLongPress={() => router.push(`/learn/new-sound?id=${level.id}` as any)}
+                  onPress={() => router.push(`/learn/new-sound?id=${level.id}` as any)}
                 >
                   <Text style={[styles.consLetter, isDone && { color: Colors.stageBlue }]}>
                     {level.letter}
@@ -71,7 +61,6 @@ export default function ConsonantCastlePage() {
                   <Text style={styles.consPinyin}>{level.pinyin}</Text>
                   <Text style={styles.consExample}>{level.example}</Text>
 
-                  {isPlaying && <Text style={styles.playingBadge}>🔊</Text>}
                   {isDone && (
                     <Text style={styles.doneBadge}>
                       {'★'.repeat(stars)}
@@ -84,7 +73,7 @@ export default function ConsonantCastlePage() {
         </View>
       ))}
 
-      <Text style={styles.hint}>💡 点击卡片听发音，长按进入完整学习关卡</Text>
+      <Text style={styles.hint}>💡 点击卡片进入学习关卡，听字母发音和连读</Text>
 
       <TouchableOpacity style={styles.backBtn} onPress={() => router.navigate('/(tabs)')}>
         <Text style={styles.backText}>← 返回首页</Text>
