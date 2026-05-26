@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
-import { playPinyin } from '@/services/audio';
+import { playLetter } from '@/services/audio';
 
 // 快闪字母库
 const FLASH_LETTERS = [
@@ -52,9 +52,9 @@ export default function FlashReadPage() {
       useNativeDriver: true,
     }).start();
 
-    // 播放发音
+    // 播放发音（用 playLetter 确保中文发音，不回退到英文TTS）
     const letter = letters[currentIndex];
-    try { playPinyin(letter, { rate: 0.4 }); } catch {}
+    try { playLetter(letter, { rate: 0.5 }); } catch {}
 
     // 1.5秒后自动隐藏
     setTimeout(() => {

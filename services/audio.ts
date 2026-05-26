@@ -115,7 +115,7 @@ const FLASH_AUDIO_MAP: Record<string, string> = {
 const LETTER_AUDIO_MAP: Record<string, string> = {
   // 第一阶段：单韵母
   'a': 'letter_a', 'o': 'letter_o', 'e': 'letter_e',
-  'i': 'letter_i', 'u': 'letter_u', 'v': 'letter_v',
+  'i': 'letter_i', 'u': 'letter_u', 'v': 'letter_v', 'ü': 'letter_v',
   // 第二阶段：声母（慢速发音，突出辅音）
   'b': 'letter_b', 'p': 'letter_p', 'm': 'letter_m', 'f': 'letter_f',
   'd': 'letter_d', 't': 'letter_t', 'n': 'letter_n', 'l': 'letter_l',
@@ -135,6 +135,30 @@ const LETTER_AUDIO_MAP: Record<string, string> = {
   'ri': 'letter_ri', 'zi': 'letter_zi', 'ci': 'letter_ci',
   'si': 'letter_si', 'yi': 'letter_yi', 'wu': 'letter_wu',
   'yu': 'letter_yu', 'ye': 'letter_ye',
+  // 额外映射：快闪认读用到的组合
+  'yue': 'letter_ve', 'yun': 'letter_yu',
+};
+
+// 字母回退 TTS 用中文文本（防止读成英文）
+const LETTER_TTS_FALLBACK: Record<string, string> = {
+  'a': '阿', 'o': '哦', 'e': '鹅', 'i': '衣', 'u': '乌', 'v': '鱼', 'ü': '鱼',
+  'b': '玻', 'p': '坡', 'm': '摸', 'f': '佛',
+  'd': '得', 't': '特', 'n': '呢', 'l': '勒',
+  'g': '哥', 'k': '科', 'h': '喝',
+  'j': '鸡', 'q': '七', 'x': '西',
+  'zh': '知', 'ch': '吃', 'sh': '诗', 'r': '日',
+  'z': '资', 'c': '次', 's': '思',
+  'y': '衣', 'w': '乌',
+  'ai': '爱', 'ei': '诶', 'ui': '威',
+  'ao': '熬', 'ou': '欧', 'iu': '优',
+  'ie': '耶', 've': '约', 'er': '耳',
+  'an': '安', 'en': '恩', 'in': '因',
+  'ang': '昂', 'eng': '鞥',
+  'zhi': '织', 'chi': '吃', 'shi': '狮',
+  'ri': '日', 'zi': '字', 'ci': '瓷',
+  'si': '丝', 'yi': '衣', 'wu': '无',
+  'yu': '雨', 'ye': '夜',
+  'yue': '约', 'yun': '云',
 };
 
 /**
@@ -219,6 +243,32 @@ function playAudioFile(url: string): Promise<boolean> {
   });
 }
 
+// playPinyin 回退 TTS 用中文文本
+const PINYIN_TTS_FALLBACK: Record<string, string> = {
+  'ā': '阿', 'ō': '哦', 'ē': '鹅', 'ī': '衣', 'ū': '乌', 'ǖ': '鱼',
+  'bō': '波', 'pō': '泼', 'mō': '摸', 'fō': '佛',
+  'dē': '得', 'tē': '特', 'nē': '呢', 'lē': '勒',
+  'gē': '哥', 'kē': '科', 'hē': '喝',
+  'jī': '鸡', 'qī': '七', 'xī': '西',
+  'zhī': '知', 'chī': '吃', 'shī': '诗',
+  'rì': '日', 'zī': '资', 'cī': '次', 'sī': '思',
+  'yī': '衣', 'wū': '乌',
+  'āi': '爱', 'ēi': '诶', 'uī': '威',
+  'āo': '熬', 'ōu': '欧', 'iū': '优',
+  'iē': '耶', 'üē': '约', 'ér': '耳',
+  'ān': '安', 'ēn': '恩', 'yīn': '因',
+  'āng': '昂', 'ēng': '鞥',
+  'zì': '字', 'cí': '瓷', 'wú': '无',
+  'yǔ': '雨', 'yè': '夜',
+};
+
+// playPinyin 回退 TTS 用中文文本
+const FLASH_TTS_FALLBACK: Record<string, string> = {
+  '波': '波', '泼': '泼', '摸': '摸',
+  '佛': '佛', '得': '得', '特': '特',
+  '呢': '呢', '哥': '哥', '科': '科', '喝': '喝',
+};
+
 /**
  * 查找文本对应的预生成音频 key
  */
@@ -274,8 +324,9 @@ export async function playPinyin(
     console.log('[audio] 文件播放失败，回退到 TTS:', text);
   }
 
-  // 回退到 expo-speech (Web Speech API)
-  await speakWithTTS(text, { language, rate, pitch });
+  // 回退到 expo-speech (Web Speech API)，用中文文本避免读成英文
+  const fallbackText = PINYIN_TTS_FALLBACK[text] || FLASH_TTS_FALLBACK[text] || text;
+  await speakWithTTS(fallbackText, { language, rate, pitch });
 }
 
 /**
@@ -294,8 +345,9 @@ export async function playLetter(
     if (success) return;
     console.log('[audio] 字母音频播放失败，回退到 TTS:', levelId);
   }
-  // 回退：用 TTS 读字母
-  await speakWithTTS(levelId, { language, rate, pitch });
+  // 回退：用 TTS 读中文文本（防止单字母被读成英文）
+  const fallbackText = LETTER_TTS_FALLBACK[levelId] || levelId;
+  await speakWithTTS(fallbackText, { language, rate, pitch });
 }
 
 /**

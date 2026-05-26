@@ -115,13 +115,18 @@ function ToneAnimation({
     y: (p.y / 90) * canvasH,
   }));
 
+  // 多点插值：第三声有3个点（V形），其他声调2个点
+  const inputRange = points.map((_, i) => i / (points.length - 1));
+  const outputRangeX = points.map(p => p.x);
+  const outputRangeY = points.map(p => p.y);
+
   const dotX = dotAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [points[0].x, points[points.length - 1].x],
+    inputRange,
+    outputRange: outputRangeX,
   });
   const dotY = dotAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [points[0].y, points[points.length - 1].y],
+    inputRange,
+    outputRange: outputRangeY,
   });
 
   // 路径线条样式
