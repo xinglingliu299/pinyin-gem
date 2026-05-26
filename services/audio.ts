@@ -110,6 +110,33 @@ const FLASH_AUDIO_MAP: Record<string, string> = {
   '喝': 'flash_h',
 };
 
+// 字母独立发音映射（两步学习法：先听字母音，再听连读）
+// key = 关卡 id（level.id），value = 音频文件名
+const LETTER_AUDIO_MAP: Record<string, string> = {
+  // 第一阶段：单韵母
+  'a': 'letter_a', 'o': 'letter_o', 'e': 'letter_e',
+  'i': 'letter_i', 'u': 'letter_u', 'v': 'letter_v',
+  // 第二阶段：声母（慢速发音，突出辅音）
+  'b': 'letter_b', 'p': 'letter_p', 'm': 'letter_m', 'f': 'letter_f',
+  'd': 'letter_d', 't': 'letter_t', 'n': 'letter_n', 'l': 'letter_l',
+  'g': 'letter_g', 'k': 'letter_k', 'h': 'letter_h',
+  'j': 'letter_j', 'q': 'letter_q', 'x': 'letter_x',
+  'zh': 'letter_zh', 'ch': 'letter_ch', 'sh': 'letter_sh', 'r': 'letter_r',
+  'z': 'letter_z', 'c': 'letter_c', 's': 'letter_s',
+  'y': 'letter_y', 'w': 'letter_w',
+  // 第三阶段：复韵母+鼻韵母
+  'ai': 'letter_ai', 'ei': 'letter_ei', 'ui': 'letter_ui',
+  'ao': 'letter_ao', 'ou': 'letter_ou', 'iu': 'letter_iu',
+  'ie': 'letter_ie', 've': 'letter_ve', 'er': 'letter_er',
+  'an': 'letter_an', 'en': 'letter_en', 'in': 'letter_in',
+  'ang': 'letter_ang', 'eng': 'letter_eng',
+  // 第四阶段：整体认读音节
+  'zhi': 'letter_zhi', 'chi': 'letter_chi', 'shi': 'letter_shi',
+  'ri': 'letter_ri', 'zi': 'letter_zi', 'ci': 'letter_ci',
+  'si': 'letter_si', 'yi': 'letter_yi', 'wu': 'letter_wu',
+  'yu': 'letter_yu', 'ye': 'letter_ye',
+};
+
 /**
  * 获取音频文件路径
  * 从当前页面 URL 自动推导 base path，不依赖任何全局变量
@@ -249,6 +276,26 @@ export async function playPinyin(
 
   // 回退到 expo-speech (Web Speech API)
   await speakWithTTS(text, { language, rate, pitch });
+}
+
+/**
+ * 播放字母独立发音（两步学习法第一步）
+ * 通过关卡 ID 查找对应的字母音频文件
+ */
+export async function playLetter(
+  levelId: string,
+  options: PlayOptions = {},
+): Promise<void> {
+  const { language = 'zh-CN', rate = 0.5, pitch = 1.0 } = options;
+  const audioKey = LETTER_AUDIO_MAP[levelId];
+  if (audioKey) {
+    const url = getAudioUrl(audioKey);
+    const success = await playAudioFile(url);
+    if (success) return;
+    console.log('[audio] 字母音频播放失败，回退到 TTS:', levelId);
+  }
+  // 回退：用 TTS 读字母
+  await speakWithTTS(levelId, { language, rate, pitch });
 }
 
 /**

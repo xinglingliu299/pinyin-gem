@@ -105,14 +105,52 @@ FLASH_AUDIO = [
 ]
 AUDIO_ITEMS.extend(FLASH_AUDIO)
 
+# ── 字母独立发音（两步学习法：先听字母，再听连读）──
+# 声母用较慢语速（-30%）突出辅音，韵母和整体认读用正常语速
+LETTER_AUDIO = [
+    # 第一阶段：单韵母（字母本身就是完整发音）
+    ("letter_a", "阿"), ("letter_o", "哦"), ("letter_e", "鹅"),
+    ("letter_i", "衣"), ("letter_u", "乌"), ("letter_v", "鱼"),
+    # 第二阶段：声母（较慢语速，突出辅音本音）
+    ("letter_b", "玻"), ("letter_p", "坡"), ("letter_m", "摸"), ("letter_f", "佛"),
+    ("letter_d", "得"), ("letter_t", "特"), ("letter_n", "呢"), ("letter_l", "勒"),
+    ("letter_g", "哥"), ("letter_k", "科"), ("letter_h", "喝"),
+    ("letter_j", "鸡"), ("letter_q", "七"), ("letter_x", "西"),
+    ("letter_zh", "知"), ("letter_ch", "吃"), ("letter_sh", "诗"), ("letter_r", "日"),
+    ("letter_z", "资"), ("letter_c", "次"), ("letter_s", "思"),
+    ("letter_y", "衣"), ("letter_w", "乌"),
+    # 第三阶段：复韵母+鼻韵母（字母即完整发音）
+    ("letter_ai", "爱"), ("letter_ei", "诶"), ("letter_ui", "威"),
+    ("letter_ao", "熬"), ("letter_ou", "欧"), ("letter_iu", "优"),
+    ("letter_ie", "耶"), ("letter_ve", "约"), ("letter_er", "耳"),
+    ("letter_an", "安"), ("letter_en", "恩"), ("letter_in", "因"),
+    ("letter_ang", "昂"), ("letter_eng", "鞥"),
+    # 第四阶段：整体认读音节（直接读出）
+    ("letter_zhi", "织"), ("letter_chi", "吃"), ("letter_shi", "狮"),
+    ("letter_ri", "日"), ("letter_zi", "字"), ("letter_ci", "瓷"),
+    ("letter_si", "丝"), ("letter_yi", "衣"), ("letter_wu", "无"),
+    ("letter_yu", "雨"), ("letter_ye", "夜"),
+]
 
-async def generate_one(name: str, text: str):
+# 标记哪些字母需要慢速发音（声母）
+SLOW_RATE_LETTERS = {
+    "letter_b", "letter_p", "letter_m", "letter_f",
+    "letter_d", "letter_t", "letter_n", "letter_l",
+    "letter_g", "letter_k", "letter_h",
+    "letter_j", "letter_q", "letter_x",
+    "letter_zh", "letter_ch", "letter_sh", "letter_r",
+    "letter_z", "letter_c", "letter_s",
+    "letter_y", "letter_w",
+}
+
+
+async def generate_one(name: str, text: str, rate: str = "+0%"):
     """生成单条音频"""
     output_path = os.path.join(OUTPUT_DIR, f"{name}.mp3")
     if os.path.exists(output_path):
         return  # 跳过已存在的文件
     try:
-        communicate = edge_tts.Communicate(text, VOICE)
+        communicate = edge_tts.Communicate(text, VOICE, rate=rate)
         await communicate.save(output_path)
         return True
     except Exception as e:
@@ -121,7 +159,7 @@ async def generate_one(name: str, text: str):
 
 
 async def main():
-    total = len(AUDIO_ITEMS)
+    total = len(AUDIO_ITEMS) + len(LETTER_AUDIO)
     print(f"开始生成 {total} 条音频...")
     print(f"输出目录: {OUTPUT_DIR}")
     print(f"声音: {VOICE}")
@@ -130,8 +168,11 @@ async def main():
     success = 0
     skipped = 0
     failed = 0
+    idx = 0
 
-    for i, (name, text) in enumerate(AUDIO_ITEMS):
+    # 生成常规音频
+    for name, text in AUDIO_ITEMS:
+        idx += 1
         output_path = os.path.join(OUTPUT_DIR, f"{name}.mp3")
         if os.path.exists(output_path):
             skipped += 1
@@ -140,10 +181,30 @@ async def main():
         result = await generate_one(name, text)
         if result:
             success += 1
-            print(f"  [{i+1}/{total}] OK: {name} = '{text}'")
+            print(f"  [{idx}/{total}] OK: {name} = '{text}'")
         else:
             failed += 1
-            print(f"  [{i+1}/{total}] FAIL: {name}")
+            print(f"  [{idx}/{total}] FAIL: {name}")
+
+    # 生成字母独立发音音频（声母用慢速）
+    print()
+    print("── 生成字母独立发音（声母慢速突出辅音）──")
+    for name, text in LETTER_AUDIO:
+        idx += 1
+        output_path = os.path.join(OUTPUT_DIR, f"{name}.mp3")
+        if os.path.exists(output_path):
+            skipped += 1
+            continue
+
+        rate = "-30%" if name in SLOW_RATE_LETTERS else "+0%"
+        result = await generate_one(name, text, rate=rate)
+        if result:
+            success += 1
+            rate_str = f" (rate={rate})" if rate != "+0%" else ""
+            print(f"  [{idx}/{total}] OK: {name} = '{text}'{rate_str}")
+        else:
+            failed += 1
+            print(f"  [{idx}/{total}] FAIL: {name}")
 
     print()
     print(f"完成! 新生成: {success}, 跳过(已存在): {skipped}, 失败: {failed}")
