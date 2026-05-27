@@ -1,9 +1,11 @@
 import React from 'react';
 import { Stack } from 'expo-router';
+import { AuthProvider } from '@/services/auth';
 import { ProgressProvider } from '@/services/progress';
 
 export default function RootLayout() {
   return (
+    <AuthProvider>
     <ProgressProvider>
     <Stack
       screenOptions={{
@@ -14,6 +16,9 @@ export default function RootLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="welcome" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="auth/login" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="auth/register" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="auth/forgot-password" options={{ gestureEnabled: false }} />
       <Stack.Screen
         name="learn/new-sound"
         options={{ presentation: 'modal', title: '认识新音' }}
@@ -94,8 +99,13 @@ export default function RootLayout() {
         name="profile/favorites"
         options={{ title: '我的收藏', headerShown: false }}
       />
+      <Stack.Screen
+        name="profile/recordings"
+        options={{ title: '我的录音', headerShown: false }}
+      />
       <Stack.Screen name="settings" options={{ title: '设置', headerShown: false }} />
     </Stack>
     </ProgressProvider>
+    </AuthProvider>
   );
 }

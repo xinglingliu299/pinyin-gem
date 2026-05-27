@@ -30,7 +30,6 @@ function getMessage(stars: number): string {
 export default function PracticePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const level = getLevelById(id ?? 'b');
-  const webUnsupported = Platform.OS === 'web';
 
   const [recording, setRecording] = useState(false);
   const [confidence, setConfidence] = useState<number | null>(null);
@@ -66,8 +65,6 @@ export default function PracticePage() {
   const message = hasResult ? getMessage(earnedStars) : '';
 
   const handleRecord = useCallback(async () => {
-    if (webUnsupported) return;
-
     if (recording) {
       // 手动停止录音
       try {
@@ -93,7 +90,7 @@ export default function PracticePage() {
       // 权限拒绝等错误已在 audio.ts 中弹窗提示
       setErrorMsg(e?.message || '录音启动失败');
     }
-  }, [recording, webUnsupported]);
+  }, [recording]);
 
   if (!level) return null;
 
@@ -115,30 +112,16 @@ export default function PracticePage() {
 
       {/* Record Area */}
       <View style={[styles.recordArea, { width: cardWidth }]}>
-        {webUnsupported ? (
-          <View style={styles.webNotice}>
-            <Text style={styles.webNoticeIcon}>🎤</Text>
-            <Text style={styles.webNoticeText}>
-              网页版暂不支持录音功能
-            </Text>
-            <Text style={styles.webNoticeSubtext}>
-              请在手机或平板上体验哦~
-            </Text>
-          </View>
-        ) : (
-          <>
-            <TouchableOpacity
-              style={[styles.recordBtn, recording && styles.recordBtnActive]}
-              activeOpacity={0.8}
-              onPress={handleRecord}
-            >
-              <Text style={styles.recordIcon}>🎤</Text>
-            </TouchableOpacity>
-            <Text style={styles.recordHint}>
-              {recording ? '正在录音...松开停止' : '按住说话'}
-            </Text>
-          </>
-        )}
+        <TouchableOpacity
+          style={[styles.recordBtn, recording && styles.recordBtnActive]}
+          activeOpacity={0.8}
+          onPress={handleRecord}
+        >
+          <Text style={styles.recordIcon}>🎤</Text>
+        </TouchableOpacity>
+        <Text style={styles.recordHint}>
+          {recording ? '正在录音...点击停止' : '点击开始录音'}
+        </Text>
 
         {/* 错误提示 */}
         {errorMsg && (

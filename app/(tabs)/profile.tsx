@@ -1,17 +1,19 @@
-// 个人中心 - 接入真实进度数据
+// 个人中心 - 接入真实进度数据 + 用户登录
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { useProgress } from '@/services/progress';
+import { useAuth } from '@/services/auth';
 import { TOTAL_LEVELS } from '@/data/curriculum';
 
 const menuItems = [
   { icon: '📚', label: '我的课程', route: '/profile/courses' },
   { icon: '🏆', label: '学习成就', route: '/profile/achievements' },
   { icon: '📊', label: '学习报告', route: '/profile/report' },
+  { icon: '🎙️', label: '我的录音', route: '/profile/recordings' },
   { icon: '❤️', label: '我的收藏', route: '/profile/favorites' },
   { icon: '⚙️', label: '设置', route: '/settings' },
 ];
@@ -42,8 +44,21 @@ function getLevel(progress: ReturnType<typeof useProgress>['progress']) {
 
 export default function ProfilePage() {
   const { progress } = useProgress();
+  const { user, signOut } = useAuth();
   const badges = getBadges(progress);
   const userLevel = getLevel(progress);
+  const isLoggedIn = !!user;
+
+  const handleLogout = () => {
+    Alert.alert('确认退出', '退出登录后，下次登录可恢复云端数据', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '退出登录',
+        style: 'destructive',
+        onPress: () => signOut(),
+      },
+    ]);
+  };
 
   return (
     <ScrollView
@@ -56,8 +71,19 @@ export default function ProfilePage() {
         <View style={styles.avatar}>
           <Text style={styles.avatarEmoji}>👸</Text>
         </View>
-        <Text style={styles.userName}>小魔法师</Text>
+        <Text style={styles.userName}>
+          {isLoggedIn ? user!.email?.split('@')[0] || '小魔法师' : '小魔法师'}
+        </Text>
         <Text style={styles.userLevel}>Lv.{userLevel.lv} {userLevel.title}</Text>
+        {!isLoggedIn && (
+          <TouchableOpacity
+            style={styles.loginBtn}
+            onPress={() => router.push('/auth/login' as any)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginBtnText}>登录账号</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Stats - 真实数据 */}
@@ -105,6 +131,16 @@ export default function ProfilePage() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {isLoggedIn && (
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.logoutBtnText}>退出登录</Text>
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.version}>拼音魔法公主 v1.0.0</Text>
     </ScrollView>
@@ -244,5 +280,36 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: Spacing.sectionGap,
+  },
+  loginBtn: {
+    marginTop: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.magicPurple,
+  },
+  loginBtnText: {
+    fontFamily: FontFamily.primary,
+    fontSize: FontSizes.callout,
+    fontWeight: FontWeights.medium,
+    color: Colors.pureWhite,
+  },
+  logoutBtn: {
+    marginTop: Spacing.sectionGap,
+    padding: 14,
+    borderRadius: Spacing.cardRadius,
+    backgroundColor: Colors.pureWhite,
+    alignItems: 'center',
+    shadowColor: 'rgba(0,0,0,0.04)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  logoutBtnText: {
+    fontFamily: FontFamily.primary,
+    fontSize: FontSizes.callout,
+    color: Colors.errorRed,
+    fontWeight: FontWeights.medium,
   },
 });

@@ -367,19 +367,49 @@ export function stopSpeaking(): void {
 }
 
 // ---- Recording ----
+// 支持：原生 expo-av + Web MediaRecorder API
+
+let webMediaRecorder: MediaRecorder | null = null;
+let webAudioChunks: Blob[] = [];
+let webStream: MediaStream | null = null;
 
 export async function startRecording(): Promise<void> {
   if (isRecording) return;
 
-  if (Platform.OS === 'web') {
-    Alert.alert(
-      '提示',
-      '网页版暂不支持录音功能，请在手机或平板上使用哦~',
-      [{ text: '知道了' }],
-    );
-    throw new Error('Recording not supported on web');
+  // Web 端：使用 MediaRecorder API
+  if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.mediaDevices) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      webStream = stream;
+      webAudioChunks = [];
+
+      // 优先使用 webm，Safari 回退 mp4
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : 'audio/webm';
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) webAudioChunks.push(e.data);
+      };
+      recorder.start(200); // 每200ms一个chunk
+      webMediaRecorder = recorder;
+      isRecording = true;
+      return;
+    } catch (error: any) {
+      if (error?.name === 'NotAllowedError') {
+        Alert.alert(
+          '需要麦克风权限',
+          '请在浏览器中允许麦克风访问后重试。',
+        );
+      }
+      throw new Error('麦克风访问失败');
+    }
   }
 
+  // 原生端：expo-av
   try {
     const { status } = await Audio.requestPermissionsAsync();
     if (status !== 'granted') {
@@ -419,6 +449,28 @@ export async function startRecording(): Promise<void> {
 }
 
 export async function stopRecording(): Promise<RecordingResult> {
+  // Web 端：停止 MediaRecorder
+  if (webMediaRecorder && webMediaRecorder.state !== 'inactive') {
+    return new Promise<RecordingResult>((resolve) => {
+      const mimeType = webMediaRecorder!.mimeType;
+      webMediaRecorder!.onstop = () => {
+        const blob = new Blob(webAudioChunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        // 清理流
+        webStream?.getTracks().forEach((t) => t.stop());
+        webStream = null;
+        webMediaRecorder = null;
+        webAudioChunks = [];
+        isRecording = false;
+
+        // 随机评分（后续可接入真实语音识别）
+        const confidence = Math.floor(Math.random() * 41) + 60;
+        resolve({ uri: url, confidence });
+      };
+      webMediaRecorder!.stop();
+    });
+  }
+
   if (!isRecording || !recordingInstance) {
     return { uri: '', confidence: 0 };
   }
