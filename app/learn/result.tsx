@@ -17,10 +17,10 @@ export default function LevelResultPage() {
   const earnedStars = parseInt(starsParam ?? '3', 10);
   const nextLevel = getNextLevel(level?.id ?? '');
 
-  // 关卡完成时保存进度
+  // 关卡完成时保存进度（即使 stars=0 也记录完成）
   useEffect(() => {
-    if (level && earnedStars > 0) {
-      completeLevel(level.id, earnedStars);
+    if (level) {
+      completeLevel(level.id, Math.max(earnedStars, 1));
     }
   }, [level?.id, earnedStars]);
 

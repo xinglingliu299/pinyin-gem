@@ -159,11 +159,33 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
           ? Math.max(0, stars - prevStars)
           : stars;
 
+        // 计算连续打卡天数
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        let newStreak = prev.streak;
+        let newLastCheckin = prev.lastCheckin;
+
+        if (prev.lastCheckin === today) {
+          // 今天已经打卡过，不重复计数
+          newStreak = prev.streak;
+          newLastCheckin = today;
+        } else if (prev.lastCheckin === yesterday) {
+          // 昨天打卡了，连续+1
+          newStreak = prev.streak + 1;
+          newLastCheckin = today;
+        } else {
+          // 断签或首次，重新开始
+          newStreak = 1;
+          newLastCheckin = today;
+        }
+
         const newProgress: UserProgress = {
           ...prev,
           completedLevels: newCompletedLevels,
           starRatings: newStarRatings,
           totalStars: prev.totalStars + starsDelta,
+          streak: newStreak,
+          lastCheckin: newLastCheckin,
         };
 
         // 异步双写

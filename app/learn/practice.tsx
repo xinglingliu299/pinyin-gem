@@ -61,7 +61,7 @@ export default function PracticePage() {
     return () => { cleanupRecording(); };
   }, []);
 
-  const earnedStars = confidence !== null ? getStars(confidence) : 0;
+  const earnedStars = confidence !== null ? getStars(confidence) : 1;
   const message = hasResult ? getMessage(earnedStars) : '';
 
   const handleRecord = useCallback(async () => {
