@@ -1,58 +1,35 @@
 // 我的收藏 - 收藏的拼音关卡
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { getLevelById } from '@/data/curriculum';
 import { useProgress } from '@/services/progress';
+import { getFavorites, toggleFavorite } from '@/services/favorites';
 
-const FAVORITES_KEY = '@pinyin_favorites';
-
-// 收藏服务 hook
-function useFavorites() {
+export default function FavoritesPage() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const { progress } = useProgress();
 
   useEffect(() => {
-    (async () => {
-      try {
-        const stored = await AsyncStorage.getItem(FAVORITES_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) setFavorites(parsed);
-        }
-      } catch {} finally { setLoading(false); }
-    })();
-  }, []);
-
-  const toggleFavorite = useCallback(async (levelId: string) => {
-    setFavorites((prev) => {
-      const next = prev.includes(levelId)
-        ? prev.filter((id) => id !== levelId)
-        : [...prev, levelId];
-      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
+    getFavorites().then((list) => {
+      setFavorites(list);
+      setLoading(false);
     });
   }, []);
 
-  const isFavorite = useCallback((levelId: string) => favorites.includes(levelId), [favorites]);
-
-  return { favorites, loading, toggleFavorite, isFavorite };
-}
-
-export default function FavoritesPage() {
-  const { favorites, loading, toggleFavorite } = useFavorites();
-  const { progress } = useProgress();
+  const handleToggle = useCallback(async (levelId: string) => {
+    const isNowFav = await toggleFavorite(levelId);
+    if (!isNowFav) {
+      // 已取消收藏，刷新列表
+      setFavorites((prev) => prev.filter((id) => id !== levelId));
+    }
+    setConfirmRemoveId(null);
+  }, []);
 
   const levels = favorites.map((id) => getLevelById(id)).filter(Boolean);
-
-  const handleRemove = (id: string) => {
-    Alert.alert('取消收藏', '确定要取消收藏这个拼音吗？', [
-      { text: '取消', style: 'cancel' },
-      { text: '确定', onPress: () => toggleFavorite(id) },
-    ]);
-  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -96,7 +73,7 @@ export default function FavoritesPage() {
                 ]}
                 activeOpacity={0.7}
                 onPress={() => router.push(`/learn/new-sound?id=${level.id}` as any)}
-                onLongPress={() => handleRemove(level.id)}
+                onLongPress={() => setConfirmRemoveId(level.id)}
               >
                 {/* 左侧：字母 */}
                 <View style={styles.favLetterWrap}>
@@ -125,7 +102,7 @@ export default function FavoritesPage() {
                   )}
                   <TouchableOpacity
                     style={styles.removeBtn}
-                    onPress={() => handleRemove(level.id)}
+                    onPress={() => setConfirmRemoveId(level.id)}
                   >
                     <Text style={styles.removeText}>取消</Text>
                   </TouchableOpacity>
@@ -138,7 +115,25 @@ export default function FavoritesPage() {
 
       {/* 提示 */}
       {levels.length > 0 && (
-        <Text style={styles.footerHint}>💡 长按卡片可取消收藏</Text>
+        <Text style={styles.footerHint}>💡 点击"取消"可移除收藏</Text>
+      )}
+
+      {/* 确认取消收藏弹窗 */}
+      {confirmRemoveId && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>取消收藏</Text>
+            <Text style={styles.modalBody}>确定要取消收藏这个拼音吗？</Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setConfirmRemoveId(null)} activeOpacity={0.8}>
+                <Text style={styles.modalCancelText}>再想想</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={() => handleToggle(confirmRemoveId)} activeOpacity={0.8}>
+                <Text style={styles.modalConfirmText}>确定</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
 
       {/* 返回 */}
@@ -198,6 +193,42 @@ const styles = StyleSheet.create({
   goLearnText: {
     fontFamily: FontFamily.primary, fontSize: FontSizes.callout,
     fontWeight: FontWeights.medium, color: Colors.pureWhite,
+  },
+  // Confirm modal
+  modalOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center', zIndex: 999,
+  },
+  modalBox: {
+    width: '80%', maxWidth: 300,
+    backgroundColor: Colors.pureWhite, borderRadius: 16, padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontFamily: FontFamily.primary, fontSize: FontSizes.title3,
+    fontWeight: FontWeights.medium, color: Colors.textPrimary, marginBottom: 8,
+  },
+  modalBody: {
+    fontFamily: FontFamily.primary, fontSize: FontSizes.body,
+    color: Colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 20,
+  },
+  modalBtns: { flexDirection: 'row', gap: 12 },
+  modalCancel: {
+    flex: 1, paddingVertical: 10, borderRadius: 10,
+    backgroundColor: '#F3F4F6', alignItems: 'center',
+  },
+  modalCancelText: {
+    fontFamily: FontFamily.primary, fontSize: FontSizes.callout,
+    color: Colors.textSecondary, fontWeight: FontWeights.medium,
+  },
+  modalConfirm: {
+    flex: 1, paddingVertical: 10, borderRadius: 10,
+    backgroundColor: Colors.errorRed, alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontFamily: FontFamily.primary, fontSize: FontSizes.callout,
+    color: Colors.pureWhite, fontWeight: FontWeights.medium,
   },
   // Fav card
   listWrap: {

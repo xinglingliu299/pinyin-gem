@@ -1,5 +1,5 @@
 // 09-关卡结果页 - 含进度持久化 & 响应式布局
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
@@ -7,6 +7,7 @@ import { PrimaryButton, SecondaryButton } from '@/components';
 import { getLevelById, getNextLevel } from '@/data/curriculum';
 import { useProgress } from '@/services/progress';
 import { useResponsive } from '@/hooks/useResponsive';
+import { isFavorite, toggleFavorite } from '@/services/favorites';
 
 export default function LevelResultPage() {
   const { id, stars: starsParam } = useLocalSearchParams<{ id: string; stars?: string }>();
@@ -16,6 +17,14 @@ export default function LevelResultPage() {
 
   const earnedStars = parseInt(starsParam ?? '3', 10);
   const nextLevel = getNextLevel(level?.id ?? '');
+  const [isFav, setIsFav] = useState(false);
+
+  // 检查是否已收藏
+  useEffect(() => {
+    if (level) {
+      isFavorite(level.id).then(setIsFav);
+    }
+  }, [level?.id]);
 
   // 关卡完成时保存进度（即使 stars=0 也记录完成）
   useEffect(() => {
@@ -84,13 +93,23 @@ export default function LevelResultPage() {
         </Text>
       </View>
 
-      {/* Pinyin Review */}
+      {/* Pinyin Review + Favorite */}
       <View style={styles.reviewRow}>
         <View style={styles.reviewCard}>
           <Text style={[styles.reviewChar, { fontSize: 28 * fontSizeMultiplier }]}>
             {level.letter}
           </Text>
         </View>
+        <TouchableOpacity
+          style={[styles.favBtn, isFav && styles.favBtnActive]}
+          activeOpacity={0.7}
+          onPress={async () => {
+            const newState = await toggleFavorite(level.id);
+            setIsFav(newState);
+          }}
+        >
+          <Text style={styles.favBtnText}>{isFav ? '❤️ 已收藏' : '🤍 收藏'}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Button Row */}
@@ -223,6 +242,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: 4,
+    alignItems: 'center',
   },
   reviewCard: {
     width: 80,
@@ -236,6 +256,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 6,
     elevation: 1,
+  },
+  favBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: Colors.pureWhite,
+    borderWidth: 1.5,
+    borderColor: Colors.borderSubtle,
+    shadowColor: 'rgba(0, 0, 0, 0.05)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  favBtnActive: {
+    borderColor: '#F87171',
+    backgroundColor: '#FEF2F2',
+  },
+  favBtnText: {
+    fontFamily: FontFamily.primary,
+    fontSize: 14,
+    fontWeight: FontWeights.medium,
+    color: Colors.textSecondary,
   },
   reviewChar: {
     fontFamily: FontFamily.primary,
