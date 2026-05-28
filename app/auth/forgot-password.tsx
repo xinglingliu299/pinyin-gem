@@ -8,7 +8,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,21 +19,29 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const { resetPassword } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async () => {
+    setErrorMsg('');
     if (!email.trim()) {
-      Alert.alert('提示', '请输入邮箱');
+      setErrorMsg('请输入邮箱');
       return;
     }
     setLoading(true);
-    const { error } = await resetPassword(email.trim());
-    setLoading(false);
-    if (error) {
-      Alert.alert('发送失败', error);
-    } else {
-      setSent(true);
+    try {
+      const { error } = await resetPassword(email.trim());
+      if (error) {
+        setErrorMsg(error);
+      } else {
+        setSent(true);
+      }
+    } catch (e: any) {
+      console.error('Reset password error:', e);
+      setErrorMsg(e?.message || '网络错误，请检查网络连接后重试');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,6 +72,11 @@ export default function ForgotPasswordPage() {
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {errorMsg ? (
+              <View style={s.errorBox}>
+                <Text style={s.errorText}>{errorMsg}</Text>
+              </View>
+            ) : null}
             <TouchableOpacity
               style={[s.primaryBtn, loading && s.btnDisabled]}
               onPress={handleSubmit}
@@ -143,4 +155,6 @@ const s = StyleSheet.create({
   successText: { fontSize: 14, color: '#166534', lineHeight: 22 },
   backBtn: { marginTop: 24, alignItems: 'center', padding: 8 },
   backBtnText: { color: '#8B5CF6', fontSize: 14 },
+  errorBox: { backgroundColor: '#FEE2E2', borderRadius: 10, padding: 12, marginTop: 12 },
+  errorText: { color: '#DC2626', fontSize: 14 },
 });

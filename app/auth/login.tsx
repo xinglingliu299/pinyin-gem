@@ -8,7 +8,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,21 +19,28 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const { signIn } = useAuth();
   const router = useRouter();
 
   const handleLogin = async () => {
+    setErrorMsg('');
     if (!email.trim() || !password.trim()) {
-      Alert.alert('提示', '请输入邮箱和密码');
+      setErrorMsg('请输入邮箱和密码');
       return;
     }
     setLoading(true);
-    const { error } = await signIn(email.trim(), password);
-    setLoading(false);
-    if (error) {
-      Alert.alert('登录失败', error);
+    try {
+      const { error } = await signIn(email.trim(), password);
+      if (error) {
+        setErrorMsg(error);
+      }
+    } catch (e: any) {
+      console.error('Login error:', e);
+      setErrorMsg(e?.message || '网络错误，请检查网络连接后重试');
+    } finally {
+      setLoading(false);
     }
-    // 登录成功后 onAuthStateChange 会自动更新状态
   };
 
   return (
@@ -78,6 +84,12 @@ export default function LoginPage() {
           >
             <Text style={s.forgotText}>忘记密码？</Text>
           </TouchableOpacity>
+
+          {errorMsg ? (
+            <View style={s.errorBox}>
+              <Text style={s.errorText}>{errorMsg}</Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={[s.primaryBtn, loading && s.btnDisabled]}
@@ -163,4 +175,6 @@ const s = StyleSheet.create({
   secondaryBtnText: { color: '#8B5CF6', fontSize: 16, fontWeight: '600' },
   guestBtn: { marginTop: 16, alignItems: 'center', padding: 8 },
   guestBtnText: { color: '#9CA3AF', fontSize: 13 },
+  errorBox: { backgroundColor: '#FEE2E2', borderRadius: 10, padding: 12, marginTop: 12 },
+  errorText: { color: '#DC2626', fontSize: 14 },
 });

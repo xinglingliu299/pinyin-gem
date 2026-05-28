@@ -8,7 +8,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,31 +20,40 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const { signUp } = useAuth();
   const router = useRouter();
 
   const handleRegister = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
     if (!email.trim() || !password.trim()) {
-      Alert.alert('提示', '请输入邮箱和密码');
+      setErrorMsg('请输入邮箱和密码');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('提示', '密码至少需要6个字符');
+      setErrorMsg('密码至少需要6个字符');
       return;
     }
     if (password !== confirmPwd) {
-      Alert.alert('提示', '两次输入的密码不一致');
+      setErrorMsg('两次输入的密码不一致');
       return;
     }
     setLoading(true);
-    const { error } = await signUp(email.trim(), password);
-    setLoading(false);
-    if (error) {
-      Alert.alert('注册失败', error);
-    } else {
-      Alert.alert('注册成功', '请查看邮箱确认注册后登录', [
-        { text: '去登录', onPress: () => router.push('/auth/login' as any) },
-      ]);
+    try {
+      const { error } = await signUp(email.trim(), password);
+      if (error) {
+        setErrorMsg(error);
+      } else {
+        setSuccessMsg('注册成功！正在跳转登录页...');
+        setTimeout(() => router.push('/auth/login' as any), 1500);
+      }
+    } catch (e: any) {
+      console.error('Register error:', e);
+      setErrorMsg(e?.message || '网络错误，请检查网络连接后重试');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -93,6 +101,18 @@ export default function RegisterPage() {
             onChangeText={setConfirmPwd}
             secureTextEntry
           />
+
+          {errorMsg ? (
+            <View style={s.errorBox}>
+              <Text style={s.errorText}>{errorMsg}</Text>
+            </View>
+          ) : null}
+
+          {successMsg ? (
+            <View style={s.successBox}>
+              <Text style={s.successText}>{successMsg}</Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={[s.primaryBtn, loading && s.btnDisabled]}
@@ -147,4 +167,8 @@ const s = StyleSheet.create({
   primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   backBtn: { marginTop: 20, alignItems: 'center', padding: 8 },
   backBtnText: { color: '#8B5CF6', fontSize: 14 },
+  errorBox: { backgroundColor: '#FEE2E2', borderRadius: 10, padding: 12, marginTop: 12 },
+  errorText: { color: '#DC2626', fontSize: 14 },
+  successBox: { backgroundColor: '#D1FAE5', borderRadius: 10, padding: 12, marginTop: 12 },
+  successText: { color: '#065F46', fontSize: 14 },
 });
