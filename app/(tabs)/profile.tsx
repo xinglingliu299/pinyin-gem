@@ -1,7 +1,7 @@
 // 个人中心 - 接入真实进度数据 + 用户登录
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
@@ -49,15 +49,15 @@ export default function ProfilePage() {
   const userLevel = getLevel(progress);
   const isLoggedIn = !!user;
 
-  const handleLogout = () => {
-    Alert.alert('确认退出', '退出登录后，下次登录可恢复云端数据', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '退出登录',
-        style: 'destructive',
-        onPress: () => signOut(),
-      },
-    ]);
+  const [showConfirm, setShowConfirm] = React.useState(false);
+
+  const handleLogout = async () => {
+    setShowConfirm(false);
+    try {
+      await signOut();
+    } catch (e: any) {
+      console.error('Logout error:', e);
+    }
   };
 
   return (
@@ -135,11 +135,29 @@ export default function ProfilePage() {
       {isLoggedIn && (
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={handleLogout}
+          onPress={() => setShowConfirm(true)}
           activeOpacity={0.8}
         >
           <Text style={styles.logoutBtnText}>退出登录</Text>
         </TouchableOpacity>
+      )}
+
+      {/* 确认退出弹窗 */}
+      {showConfirm && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>确认退出</Text>
+            <Text style={styles.modalBody}>退出登录后，下次登录可恢复云端数据</Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowConfirm(false)} activeOpacity={0.8}>
+                <Text style={styles.modalCancelText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={handleLogout} activeOpacity={0.8}>
+                <Text style={styles.modalConfirmText}>退出登录</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
 
       <Text style={styles.version}>拼音魔法公主 v1.0.0</Text>
@@ -310,6 +328,67 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.primary,
     fontSize: FontSizes.callout,
     color: Colors.errorRed,
+    fontWeight: FontWeights.medium,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  modalBox: {
+    width: '80%',
+    maxWidth: 320,
+    backgroundColor: Colors.pureWhite,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontFamily: FontFamily.primary,
+    fontSize: FontSizes.title3,
+    fontWeight: FontWeights.medium,
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  modalBody: {
+    fontFamily: FontFamily.primary,
+    fontSize: FontSizes.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalBtns: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontFamily: FontFamily.primary,
+    fontSize: FontSizes.callout,
+    color: Colors.textSecondary,
+    fontWeight: FontWeights.medium,
+  },
+  modalConfirm: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.errorRed,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontFamily: FontFamily.primary,
+    fontSize: FontSizes.callout,
+    color: Colors.pureWhite,
     fontWeight: FontWeights.medium,
   },
 });
