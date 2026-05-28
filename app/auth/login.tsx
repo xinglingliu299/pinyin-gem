@@ -34,6 +34,8 @@ export default function LoginPage() {
       const { error } = await signIn(email.trim(), password);
       if (error) {
         setErrorMsg(error);
+      } else {
+        router.replace('/(tabs)' as any);
       }
     } catch (e: any) {
       console.error('Login error:', e);
