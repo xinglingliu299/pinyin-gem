@@ -4,6 +4,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'reac
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { playPinyin } from '@/services/audio';
+import { useProgress } from '@/services/progress';
+import { getLevelById } from '@/data/curriculum';
 
 // 题目：读音 + 4个选项（1正确+3错误）
 interface RoundData {
@@ -25,7 +27,29 @@ const LISTEN_ROUNDS: RoundData[] = [
   { sound: 'yǔ', correct: '雨', options: ['雨', '鱼', '衣', '一'] },
 ];
 
+function shuffle<T>(arr: T[]): T[] {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+function generateAdaptiveRounds(completedLevels: string[]): RoundData[] {
+  const learned = completedLevels
+    .map(id => getLevelById(id))
+    .filter(Boolean) as { pinyin: string; example: string; quizWrong: string[] }[];
+
+  if (learned.length >= 5) {
+    return shuffle(learned).slice(0, 10).map(level => ({
+      sound: level.pinyin,
+      correct: level.example,
+      options: shuffle([level.example, ...level.quizWrong]),
+    }));
+  }
+
+  return shuffle([...LISTEN_ROUNDS]).slice(0, 10);
+}
+
 export default function ListenMatchPage() {
+  const { progress } = useProgress();
+  const [rounds, setRounds] = useState(() => generateAdaptiveRounds(progress.completedLevels));
   const [round, setRound] = useState(0);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
@@ -36,8 +60,8 @@ export default function ListenMatchPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const roundAnim = useRef(new Animated.Value(0)).current;
 
-  const totalRounds = LISTEN_ROUNDS.length;
-  const currentRound = LISTEN_ROUNDS[round];
+  const totalRounds = rounds.length;
+  const currentRound = rounds[round];
 
   useEffect(() => {
     roundAnim.setValue(0);
@@ -113,6 +137,7 @@ export default function ListenMatchPage() {
           </View>
           <View style={styles.resultBtns}>
             <TouchableOpacity style={styles.replayBtn} onPress={() => {
+              setRounds(generateAdaptiveRounds(progress.completedLevels));
               setRound(0); setScore(0); setCorrectCount(0);
               setSelected(null); setShowResult(false);
               setGameOver(false);
@@ -141,7 +166,7 @@ export default function ListenMatchPage() {
 
       {/* Progress */}
       <View style={styles.progressRow}>
-        {LISTEN_ROUNDS.map((_, i) => (
+        {rounds.map((_, i) => (
           <View key={i} style={[styles.pDot, i < round && styles.pDotDone, i === round && styles.pDotCurrent]} />
         ))}
       </View>

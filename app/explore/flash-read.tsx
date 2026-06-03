@@ -1,9 +1,12 @@
 // 22-快闪认读 - 拼音字母快速闪现，孩子抢答
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
-import { playLetter } from '@/services/audio';
+import { playLetter, playPinyin } from '@/services/audio';
+import { useProgress } from '@/services/progress';
+import { getLevelById, getAllLevels } from '@/data/curriculum';
+import type { LevelData } from '@/data/types';
 
 // 快闪字母库
 const FLASH_LETTERS = [
@@ -16,19 +19,38 @@ const FLASH_LETTERS = [
   'yi', 'wu', 'yu', 'ye', 'yue', 'yun',
 ];
 
-function generateFlashRound(count: number): string[] {
-  const shuffled = [...FLASH_LETTERS].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+function shuffle<T>(arr: T[]): T[] {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+function generateAdaptiveLetters(completedLevels: string[], count: number): string[] {
+  const learned = completedLevels
+    .map(id => getLevelById(id)?.letter)
+    .filter(Boolean) as string[];
+
+  if (learned.length >= count) {
+    return shuffle(learned).slice(0, count);
+  }
+
+  // 混合已学 + 默认备选
+  const pool = [...new Set([...learned, ...FLASH_LETTERS])];
+  return shuffle(pool).slice(0, count);
+}
+
+function getLevelInfo(letter: string): LevelData | undefined {
+  return getAllLevels().find(l => l.letter === letter);
 }
 
 export default function FlashReadPage() {
-  const [phase, setPhase] = useState<'ready' | 'playing' | 'result'>('ready');
-  const [letters, setLetters] = useState<string[]>(() => generateFlashRound(10));
+  const { progress } = useProgress();
+  const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'review'>('ready');
+  const [letters, setLetters] = useState<string[]>(() => generateAdaptiveLetters(progress.completedLevels, 10));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visible, setVisible] = useState(false);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [reviewPlayingId, setReviewPlayingId] = useState<string | null>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameActive = useRef(false);
@@ -56,27 +78,28 @@ export default function FlashReadPage() {
     const letter = letters[currentIndex];
     try { playLetter(letter, { rate: 0.5 }); } catch {}
 
-    // 1.5秒后自动隐藏
+    // 2.5秒后自动隐藏（放慢速度，孩子更容易跟上）
     setTimeout(() => {
       Animated.timing(flashAnim, {
-        toValue: 0, duration: 200,
+        toValue: 0, duration: 300,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
         setVisible(false);
         setCurrentIndex((i) => i + 1);
       });
-    }, 1500);
+    }, 2500);
   };
 
   const startGame = () => {
-    const newLetters = generateFlashRound(10);
+    const newLetters = generateAdaptiveLetters(progress.completedLevels, 10);
     setLetters(newLetters);
     setCurrentIndex(0);
     setScore(0);
     setCorrectCount(0);
     setTotalCount(0);
     setVisible(false);
+    setReviewPlayingId(null);
     gameActive.current = true;
     setPhase('playing');
 
@@ -84,10 +107,10 @@ export default function FlashReadPage() {
     setTimeout(() => showLetter(), 500);
   };
 
-  // 监听轮次变化
+  // 监听轮次变化（间隔加长，让孩子有喘息时间）
   useEffect(() => {
     if (phase === 'playing' && currentIndex > 0 && currentIndex < totalRounds && gameActive.current) {
-      const timer = setTimeout(() => showLetter(), 600);
+      const timer = setTimeout(() => showLetter(), 1200);
       return () => clearTimeout(timer);
     }
     if (currentIndex >= totalRounds && gameActive.current) {
@@ -114,10 +137,10 @@ export default function FlashReadPage() {
           <Text style={styles.readyTitle}>快闪认读</Text>
           <Text style={styles.readyDesc}>拼音字母会快速闪过，你能认出它吗？</Text>
           <View style={styles.readyRules}>
-            <Text style={styles.ruleItem}>🔤 字母会闪现 1.5 秒</Text>
+            <Text style={styles.ruleItem}>🔤 字母会闪现 2.5 秒</Text>
             <Text style={styles.ruleItem}>👀 仔细看，大声读出来</Text>
             <Text style={styles.ruleItem}>✅ 读对了就点正确</Text>
-            <Text style={styles.ruleItem}>📊 共 10 个字母，看你能认对几个</Text>
+            <Text style={styles.ruleItem}>📊 共 10 个字母，游戏结束后可以复习</Text>
           </View>
           <TouchableOpacity style={styles.startBtn} onPress={startGame}>
             <Text style={styles.startText}>开始挑战</Text>
@@ -126,6 +149,64 @@ export default function FlashReadPage() {
             <Text style={styles.backText}>← 返回</Text>
           </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
+
+  // 复习阶段
+  if (phase === 'review') {
+    const handleReviewPlay = async (letter: string) => {
+      if (reviewPlayingId === letter) return;
+      setReviewPlayingId(letter);
+      try {
+        const info = getLevelInfo(letter);
+        if (info) {
+          await playPinyin(info.word, { rate: 0.5 });
+        } else {
+          await playLetter(letter, { rate: 0.5 });
+        }
+      } catch {}
+      setTimeout(() => setReviewPlayingId(null), 1500);
+    };
+
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setPhase('result')}>
+            <Text style={styles.backBtn}>← 返回</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>闪卡复习</Text>
+          <Text style={styles.roundLabel} />
+        </View>
+        <ScrollView contentContainerStyle={styles.reviewContent} showsVerticalScrollIndicator={false}>
+          <Text style={styles.reviewSubtitle}>点击卡片听发音，学习拼字指导</Text>
+          <View style={styles.reviewGrid}>
+            {letters.map((letter, idx) => {
+              const info = getLevelInfo(letter);
+              const isPlaying = reviewPlayingId === letter;
+              return (
+                <TouchableOpacity
+                  key={`${letter}-${idx}`}
+                  style={[styles.reviewCard, isPlaying && styles.reviewCardActive]}
+                  activeOpacity={0.8}
+                  onPress={() => handleReviewPlay(letter)}
+                >
+                  <Text style={styles.reviewLetter}>{letter}</Text>
+                  {info && (
+                    <View style={styles.reviewInfo}>
+                      <Text style={styles.reviewPinyin}>{info.pinyin}</Text>
+                      <Text style={styles.reviewWord}>{info.word}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.reviewSpeaker}>{isPlaying ? '🔊' : '▶️'}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity style={styles.reviewBackBtn} onPress={() => setPhase('result')}>
+            <Text style={styles.reviewBackText}>返回结果</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
     );
   }
@@ -153,6 +234,9 @@ export default function FlashReadPage() {
           <View style={styles.resultBtns}>
             <TouchableOpacity style={styles.replayBtn} onPress={startGame}>
               <Text style={styles.replayText}>再玩一次</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.homeBtn, { borderColor: Colors.successGreen }]} onPress={() => setPhase('review')}>
+              <Text style={[styles.homeText, { color: Colors.successGreen }]}>📖 复习闪卡</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.homeBtn} onPress={() => router.navigate('/(tabs)' as any)}>
               <Text style={styles.homeText}>🏠 回到首页</Text>
@@ -423,5 +507,82 @@ const styles = StyleSheet.create({
   homeText: {
     fontFamily: FontFamily.primary, fontSize: 15, fontWeight: "600",
     color: Colors.magicPurple,
+  },
+  // Review
+  reviewContent: {
+    padding: Spacing.pagePadding,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  reviewSubtitle: {
+    fontFamily: FontFamily.primary,
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  reviewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  reviewCard: {
+    width: '46%',
+    backgroundColor: Colors.pureWhite,
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: 'rgba(0,0,0,0.04)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 2,
+    borderColor: Colors.borderDefault,
+  },
+  reviewCardActive: {
+    borderColor: Colors.magicPurple,
+    backgroundColor: 'rgba(140,92,245,0.06)',
+  },
+  reviewLetter: {
+    fontFamily: FontFamily.primary,
+    fontSize: 36,
+    fontWeight: "800",
+    color: Colors.magicPurple,
+  },
+  reviewInfo: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  reviewPinyin: {
+    fontFamily: FontFamily.primary,
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  reviewWord: {
+    fontFamily: FontFamily.chinese,
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
+  reviewSpeaker: {
+    fontSize: 18,
+    marginTop: 2,
+  },
+  reviewBackBtn: {
+    marginTop: 16,
+    backgroundColor: Colors.magicPurple,
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    width: '100%',
+  },
+  reviewBackText: {
+    fontFamily: FontFamily.primary,
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.pureWhite,
   },
 });

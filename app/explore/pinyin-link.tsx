@@ -4,6 +4,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'reac
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { playPinyin } from '@/services/audio';
+import { useProgress } from '@/services/progress';
+import { getLevelById } from '@/data/curriculum';
 
 // 连连看配对数据
 interface PairItem {
@@ -36,8 +38,34 @@ type CardType = {
   matched: boolean;
 };
 
-function generateCards(count: number): CardType[] {
-  const selected = PAIR_DATA.slice(0, count);
+function shuffle<T>(arr: T[]): T[] {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+function generateAdaptivePairs(completedLevels: string[]): PairItem[] {
+  const learned = completedLevels
+    .map(id => getLevelById(id))
+    .filter(Boolean) as { pinyin: string; example: string }[];
+
+  const learnedPairs = learned.slice(0, 6).map((level, i) => ({
+    id: `l-${i}`,
+    pinyin: level.pinyin,
+    char: level.example,
+    sound: level.pinyin,
+  }));
+
+  if (learnedPairs.length >= 6) {
+    return learnedPairs;
+  }
+
+  // 混合已学 + 默认
+  const needed = Math.max(0, 6 - learnedPairs.length);
+  const defaults = shuffle(PAIR_DATA).slice(0, needed);
+  return shuffle([...learnedPairs, ...defaults]);
+}
+
+function generateCards(count: number, completedLevels: string[]): CardType[] {
+  const selected = generateAdaptivePairs(completedLevels).slice(0, count);
   const cards: CardType[] = [];
 
   selected.forEach((item) => {
@@ -50,7 +78,8 @@ function generateCards(count: number): CardType[] {
 }
 
 export default function PinyinLinkPage() {
-  const [cards, setCards] = useState<CardType[]>(() => generateCards(6));
+  const { progress } = useProgress();
+  const [cards, setCards] = useState<CardType[]>(() => generateCards(6, progress.completedLevels));
   const [selected1, setSelected1] = useState<string | null>(null);
   const [selected2, setSelected2] = useState<string | null>(null);
   const [matchedPairs, setMatchedPairs] = useState(0);
@@ -121,7 +150,7 @@ export default function PinyinLinkPage() {
   };
 
   const resetGame = () => {
-    setCards(generateCards(6));
+    setCards(generateCards(6, progress.completedLevels));
     setSelected1(null);
     setSelected2(null);
     setMatchedPairs(0);

@@ -1,8 +1,11 @@
 // 12-游戏：找不同大挑战 - 比较相似拼音字母
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
+import { playLetter } from '@/services/audio';
+import { useProgress } from '@/services/progress';
+import { getLevelById } from '@/data/curriculum';
 
 // 找不同题目：每组2个相似字母，目标是正确的一个
 const DIFF_ROUNDS = [
@@ -18,7 +21,34 @@ const DIFF_ROUNDS = [
   { pair: ['j', 'q'], target: 'j', hint: 'j 不送气，q 用力吹气' },
 ];
 
+function shuffle<T>(arr: T[]): T[] {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+function generateAdaptiveRounds(completedLevels: string[]): typeof DIFF_ROUNDS {
+  const learnedLetters = new Set(
+    completedLevels.map(id => getLevelById(id)?.letter).filter(Boolean) as string[]
+  );
+
+  // 优先选择与已学字母相关的题目
+  const relevant = DIFF_ROUNDS.filter(r =>
+    learnedLetters.has(r.pair[0]) || learnedLetters.has(r.pair[1])
+  );
+
+  if (relevant.length >= 5) {
+    return shuffle(relevant);
+  }
+
+  // 不足时混合默认题库
+  const usedPairs = new Set(relevant.map(r => r.pair.join('-')));
+  const remaining = DIFF_ROUNDS.filter(r => !usedPairs.has(r.pair.join('-')));
+  const needed = Math.max(0, 10 - relevant.length);
+  return shuffle([...relevant, ...remaining.slice(0, needed)]);
+}
+
 export default function FindDiffPage() {
+  const { progress } = useProgress();
+  const [rounds, setRounds] = useState(() => generateAdaptiveRounds(progress.completedLevels));
   const [round, setRound] = useState(0);
   const [score, setScore] = useState(0);
   const [found, setFound] = useState(0);
@@ -30,8 +60,8 @@ export default function FindDiffPage() {
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const roundAnim = useRef(new Animated.Value(0)).current;
 
-  const totalRounds = DIFF_ROUNDS.length;
-  const currentRound = DIFF_ROUNDS[round];
+  const totalRounds = rounds.length;
+  const currentRound = rounds[round];
 
   // 计时器
   useEffect(() => {
@@ -55,8 +85,12 @@ export default function FindDiffPage() {
     }).start();
   }, [round]);
 
-  const handleSelect = (letter: string) => {
+  const handleSelect = async (letter: string) => {
     if (showResult || gameOver) return;
+
+    // 播放字母发音
+    try { await playLetter(letter, { rate: 0.5 }); } catch {}
+
     setSelected(letter);
     setShowResult(true);
 
@@ -115,6 +149,8 @@ export default function FindDiffPage() {
           </View>
           <View style={styles.resultBtns}>
             <TouchableOpacity style={styles.replayBtn} onPress={() => {
+              const newRounds = generateAdaptiveRounds(progress.completedLevels);
+              setRounds(newRounds);
               setRound(0); setScore(0); setFound(0);
               setSelected(null); setShowResult(false);
               setGameOver(false); setTimeLeft(60);
@@ -151,7 +187,7 @@ export default function FindDiffPage() {
           <View style={[styles.progressFill, { width: `${((round) / totalRounds) * 100}%` }]} />
         </View>
         <View style={styles.progressDots}>
-          {DIFF_ROUNDS.map((_, i) => (
+          {rounds.map((_, i) => (
             <View key={i} style={[styles.dot, i < round && styles.dotDone, i === round && styles.dotCurrent]} />
           ))}
         </View>
