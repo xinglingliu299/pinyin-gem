@@ -12,7 +12,7 @@ export default function NewSoundPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const level = getLevelById(id ?? 'b');
   const { cardWidth, fontSizeMultiplier } = useResponsive();
-  const [activeArea, setActiveArea] = useState<'letter' | 'example' | null>(null);
+  const [activeArea, setActiveArea] = useState<'letter' | 'example' | 'word' | null>(null);
   const [letterPlayed, setLetterPlayed] = useState(false);
   const letterScale = useState(new Animated.Value(1))[0];
   const exampleScale = useState(new Animated.Value(1))[0];
@@ -42,6 +42,15 @@ export default function NewSoundPage() {
     ]).start();
     try {
       await playPinyin(level.pinyin, { rate: 0.5 });
+    } catch { /* silent */ }
+    setActiveArea(null);
+  };
+
+  const handlePressWord = async () => {
+    if (activeArea) return;
+    setActiveArea('word');
+    try {
+      await playPinyin(level.word, { rate: 0.5 });
     } catch { /* silent */ }
     setActiveArea(null);
   };
@@ -124,12 +133,17 @@ export default function NewSoundPage() {
         </TouchableOpacity>
       </View>
 
-      {/* Word Example */}
-      <View style={styles.wordRow}>
+      {/* Word Example - 点击播放组词发音 */}
+      <TouchableOpacity
+        style={[styles.wordRow, activeArea === 'word' && styles.wordRowActive]}
+        activeOpacity={0.8}
+        onPress={handlePressWord}
+        disabled={!!activeArea}
+      >
         <Text style={[styles.wordText, { fontSize: 16 * fontSizeMultiplier }]}>
-          📝 组词：{level.word}
+          {activeArea === 'word' ? '🔊' : '📝'} 组词：{level.word}
         </Text>
-      </View>
+      </TouchableOpacity>
 
       {/* CTA */}
       <PrimaryButton
@@ -273,6 +287,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 8,
     elevation: 2,
+  },
+  wordRowActive: {
+    backgroundColor: 'rgba(140, 92, 245, 0.08)',
+    transform: [{ scale: 0.98 }],
   },
   wordText: {
     fontFamily: FontFamily.primary,

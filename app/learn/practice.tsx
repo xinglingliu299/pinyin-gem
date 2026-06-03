@@ -35,6 +35,8 @@ export default function PracticePage() {
   const [confidence, setConfidence] = useState<number | null>(null);
   const [hasResult, setHasResult] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const [isPlayingBack, setIsPlayingBack] = useState(false);
   const { cardWidth, fontSizeMultiplier } = useResponsive();
 
   // 录音超时定时器
@@ -47,6 +49,7 @@ export default function PracticePage() {
           setConfidence(result.confidence);
           setHasResult(true);
           setRecording(false);
+          setRecordedUri(result.uri);
         } catch (e) {
           setErrorMsg('录音自动停止');
           setRecording(false);
@@ -72,6 +75,7 @@ export default function PracticePage() {
         setConfidence(result.confidence);
         setHasResult(true);
         setRecording(false);
+        setRecordedUri(result.uri);
       } catch (e: any) {
         setErrorMsg(e?.message || '录音停止失败');
         setRecording(false);
@@ -83,6 +87,8 @@ export default function PracticePage() {
     setErrorMsg(null);
     setHasResult(false);
     setConfidence(null);
+    setRecordedUri(null);
+    setIsPlayingBack(false);
     try {
       await startRecording();
       setRecording(true);
@@ -91,6 +97,21 @@ export default function PracticePage() {
       setErrorMsg(e?.message || '录音启动失败');
     }
   }, [recording]);
+
+  const handlePlayRecording = useCallback(async () => {
+    if (!recordedUri || isPlayingBack) return;
+    setIsPlayingBack(true);
+    try {
+      if (Platform.OS === 'web') {
+        const audio = new Audio(recordedUri);
+        audio.onended = () => setIsPlayingBack(false);
+        audio.onerror = () => setIsPlayingBack(false);
+        await audio.play();
+      }
+    } catch {
+      setIsPlayingBack(false);
+    }
+  }, [recordedUri, isPlayingBack]);
 
   if (!level) return null;
 
@@ -161,6 +182,18 @@ export default function PracticePage() {
           <Text style={styles.scoreText}>
             发音评分：{confidence} 分
           </Text>
+          {recordedUri && (
+            <TouchableOpacity
+              style={[styles.playBackBtn, isPlayingBack && styles.playBackBtnActive]}
+              activeOpacity={0.8}
+              onPress={handlePlayRecording}
+              disabled={isPlayingBack}
+            >
+              <Text style={styles.playBackText}>
+                {isPlayingBack ? '▶️ 正在播放...' : '🔊 重听我的录音'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -173,6 +206,8 @@ export default function PracticePage() {
             setConfidence(null);
             setErrorMsg(null);
             setRecording(false);
+            setRecordedUri(null);
+            setIsPlayingBack(false);
           }}
           style={styles.halfBtn}
         />
@@ -305,6 +340,30 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.primary,
     fontSize: 14,
     color: Colors.textSecondary,
+  },
+  playBackBtn: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: Colors.pureWhite,
+    borderWidth: 1.5,
+    borderColor: Colors.magicPurple,
+    shadowColor: 'rgba(140, 92, 245, 0.12)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  playBackBtnActive: {
+    backgroundColor: 'rgba(140, 92, 245, 0.08)',
+    borderColor: '#F59E0B',
+  },
+  playBackText: {
+    fontFamily: FontFamily.primary,
+    fontSize: 15,
+    fontWeight: FontWeights.semibold,
+    color: Colors.magicPurple,
   },
   btnRow: {
     flexDirection: 'row',
