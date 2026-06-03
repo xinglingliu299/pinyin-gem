@@ -66,6 +66,7 @@ export default function MemoryMatchPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [mismatchShake, setMismatchShake] = useState(false);
   const matchAnim = useRef(new Animated.Value(0)).current;
+  const matchedCountRef = useRef(0);
 
   const pairCount = 6; // 6对 = 12张卡
   const totalPairs = pairCount;
@@ -81,6 +82,7 @@ export default function MemoryMatchPage() {
     setCombo(0);
     setMaxCombo(0);
     setIsChecking(false);
+    matchedCountRef.current = 0;
     setPhase('playing');
   };
 
@@ -135,10 +137,11 @@ export default function MemoryMatchPage() {
           setFlipped(new Set()); // 清除所有翻开状态
           setFirstPick(null);
           setIsChecking(false);
+          matchedCountRef.current += 1;
 
           // 检查是否全部完成
-          if (newMatched.size === totalPairs) {
-            setTimeout(() => setPhase('result'), 500);
+          if (matchedCountRef.current === totalPairs) {
+            setTimeout(() => setPhase('result'), 600);
           }
         }, 600);
       } else {
