@@ -84,6 +84,14 @@ export default function RootLayout() {
         options={{ presentation: 'modal', title: '快闪认读' }}
       />
       <Stack.Screen
+        name="explore/tone-spell"
+        options={{ presentation: 'modal', title: '声调拼拼乐' }}
+      />
+      <Stack.Screen
+        name="explore/memory-match"
+        options={{ presentation: 'modal', title: '拼音消消乐' }}
+      />
+      <Stack.Screen
         name="profile/courses"
         options={{ title: '我的课程', headerShown: false }}
       />

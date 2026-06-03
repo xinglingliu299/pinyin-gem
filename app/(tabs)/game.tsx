@@ -56,6 +56,26 @@ const games: GameItem[] = [
     scoreColor: Colors.magicPurple,
     route: '/explore/flash-read',
   },
+  {
+    id: 'tone-spell',
+    title: '声调拼拼乐',
+    desc: '听汉字，选声调',
+    score: 70,
+    icon: '🎭',
+    iconBg: '#FFF3E0',
+    scoreColor: '#F59E0A',
+    route: '/explore/tone-spell',
+  },
+  {
+    id: 'memory-match',
+    title: '拼音消消乐',
+    desc: '翻牌记忆配对',
+    score: 0,
+    icon: '🃏',
+    iconBg: '#FCE4EC',
+    scoreColor: Colors.stagePink,
+    route: '/explore/memory-match',
+  },
 ];
 
 function GameCard({ game }: { game: GameItem }) {
