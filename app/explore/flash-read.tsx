@@ -185,21 +185,27 @@ export default function FlashReadPage() {
               const info = getLevelInfo(letter);
               const isPlaying = reviewPlayingId === letter;
               return (
-                <TouchableOpacity
+                <View
                   key={`${letter}-${idx}`}
                   style={[styles.reviewCard, isPlaying && styles.reviewCardActive]}
-                  activeOpacity={0.8}
-                  onPress={() => handleReviewPlay(letter)}
                 >
-                  <Text style={styles.reviewLetter}>{letter}</Text>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => { try { playLetter(letter, { rate: 0.5 }); } catch {} }}>
+                    <Text style={styles.reviewLetter}>{letter}</Text>
+                  </TouchableOpacity>
                   {info && (
                     <View style={styles.reviewInfo}>
-                      <Text style={styles.reviewPinyin}>{info.pinyin}</Text>
-                      <Text style={styles.reviewWord}>{info.word}</Text>
+                      <TouchableOpacity activeOpacity={0.7} onPress={() => { try { playLetter(letter, { rate: 0.5 }); } catch {} }}>
+                        <Text style={styles.reviewPinyin}>{info.pinyin}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity activeOpacity={0.7} onPress={() => handleReviewPlay(letter)}>
+                        <Text style={styles.reviewWord}>{info.word}</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
-                  <Text style={styles.reviewSpeaker}>{isPlaying ? '🔊' : '▶️'}</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => handleReviewPlay(letter)}>
+                    <Text style={styles.reviewSpeaker}>{isPlaying ? '🔊' : '▶️'}</Text>
+                  </TouchableOpacity>
+                </View>
               );
             })}
           </View>
