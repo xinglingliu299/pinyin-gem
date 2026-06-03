@@ -1,7 +1,8 @@
 // 07-跟读练习 - 含录音、评分 & 响应式布局
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Audio } from 'expo-av';
 import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants';
 import { PrimaryButton, SecondaryButton, LearnTopBar } from '@/components';
 import { getLevelById } from '@/data/curriculum';
@@ -37,7 +38,15 @@ export default function PracticePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isPlayingBack, setIsPlayingBack] = useState(false);
+  const playbackRef = useRef<Audio.Sound | null>(null);
   const { cardWidth, fontSizeMultiplier } = useResponsive();
+
+  // 组件卸载时清理播放实例
+  useEffect(() => {
+    return () => {
+      playbackRef.current?.unloadAsync();
+    };
+  }, []);
 
   // 录音超时定时器
   useEffect(() => {
@@ -102,12 +111,18 @@ export default function PracticePage() {
     if (!recordedUri || isPlayingBack) return;
     setIsPlayingBack(true);
     try {
-      if (Platform.OS === 'web') {
-        const audio = new Audio(recordedUri);
-        audio.onended = () => setIsPlayingBack(false);
-        audio.onerror = () => setIsPlayingBack(false);
-        await audio.play();
-      }
+      // 先卸载旧的
+      await playbackRef.current?.unloadAsync();
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: recordedUri },
+        { shouldPlay: true },
+        (status) => {
+          if (status.didJustFinish || status.didJustFinish === false && !status.isPlaying) {
+            setIsPlayingBack(false);
+          }
+        }
+      );
+      playbackRef.current = sound;
     } catch {
       setIsPlayingBack(false);
     }
@@ -201,7 +216,8 @@ export default function PracticePage() {
       <View style={styles.btnRow}>
         <SecondaryButton
           title="再试一次"
-          onPress={() => {
+          onPress={async () => {
+            await playbackRef.current?.unloadAsync();
             setHasResult(false);
             setConfidence(null);
             setErrorMsg(null);
