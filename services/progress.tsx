@@ -23,6 +23,7 @@ import {
   uploadProgress,
   clearCloudProgress,
 } from './cloud';
+import { supabase } from '@/lib/supabase';
 
 // ---- Storage Key ----
 
@@ -222,4 +223,38 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
 
 export function useProgress(): ProgressContextValue {
   return useContext(ProgressContext);
+}
+
+/**
+ * 上报学习会话到 Supabase（用于管理后台统计）
+ * 仅登录用户会上报，静默失败不影响用户体验
+ */
+export async function reportLearningSession(params: {
+  levelId: string;
+  stageId?: string;
+  sessionType: 'learn' | 'quiz' | 'practice' | 'game';
+  durationSeconds: number;
+  score?: number;
+  stars?: number;
+  difficulty?: 'easy' | 'standard' | 'hard';
+  completed?: boolean;
+}): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return; // 游客不上报
+
+    await supabase.rpc('report_learning_session', {
+      p_user_id: session.user.id,
+      p_level_id: params.levelId,
+      p_stage_id: params.stageId ?? null,
+      p_session_type: params.sessionType,
+      p_duration: params.durationSeconds,
+      p_score: params.score ?? null,
+      p_stars: params.stars ?? 0,
+      p_difficulty: params.difficulty ?? 'standard',
+      p_completed: params.completed ?? false,
+    });
+  } catch {
+    // 静默失败，不影响用户体验
+  }
 }
