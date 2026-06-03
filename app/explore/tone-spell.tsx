@@ -367,17 +367,17 @@ export default function ToneSpellPage() {
             );
           })}
         </View>
-      </Animated.View>
 
-      {/* 反馈 */}
-      {showFeedback && (
-        <View style={[styles.feedbackBox, isCorrect ? styles.feedbackCorrect : styles.feedbackWrong]}>
-          <Text style={styles.feedbackEmoji}>{isCorrect ? '✅' : '❌'}</Text>
-          <Text style={styles.feedbackText}>
-            {isCorrect ? '声调选对了！' : `正确答案是「${q.correctPinyin}」`}
-          </Text>
-        </View>
-      )}
+        {/* 反馈 */}
+        {showFeedback && (
+          <View style={[styles.feedbackBox, isCorrect ? styles.feedbackCorrect : styles.feedbackWrong]}>
+            <Text style={styles.feedbackEmoji}>{isCorrect ? '✅' : '❌'}</Text>
+            <Text style={styles.feedbackText}>
+              {isCorrect ? '声调选对了！' : `正确答案是「${q.correctPinyin}」`}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
 
       {/* 底部分数 */}
       <View style={styles.liveScore}>
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   },
   // 选项区
   optionsArea: {
-    flex: 1, padding: Spacing.pagePadding, gap: 16,
+    padding: Spacing.pagePadding, gap: 16,
   },
   optionsHint: {
     fontFamily: FontFamily.primary, fontSize: 16,
