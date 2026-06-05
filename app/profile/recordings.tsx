@@ -1,6 +1,6 @@
 /**
  * 录音列表页
- * 列出已上传的云端录音，支持播放和删除
+ * 从 Supabase 获取历史录音，只显示每个拼音最高分的那条
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -12,17 +12,16 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '@/services/auth';
 import { listRecordings, deleteRecording, type RecordingItem } from '@/services/recording';
 
 export default function RecordingsPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [recordings, setRecordings] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const currentAudio = useState<HTMLAudioElement | null>(null)[0];
+  const currentAudioRef = React.useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -31,30 +30,27 @@ export default function RecordingsPage() {
       setLoading(false);
     }
     return () => {
-      if (currentAudio) {
-        currentAudio.pause();
-      }
+      currentAudioRef.current?.pause();
     };
   }, [user]);
 
   const loadRecordings = async () => {
-    if (!user) return;
     setLoading(true);
-    const items = await listRecordings(user);
+    const items = await listRecordings();
     setRecordings(items);
     setLoading(false);
   };
 
   const handlePlay = (item: RecordingItem) => {
     if (playingId === item.id) {
-      // 停止
-      if (currentAudio) currentAudio.pause();
+      currentAudioRef.current?.pause();
       setPlayingId(null);
       return;
     }
-    if (currentAudio) currentAudio.pause();
+    currentAudioRef.current?.pause();
 
     const audio = new Audio(item.url);
+    currentAudioRef.current = audio;
     audio.onended = () => setPlayingId(null);
     audio.onerror = () => {
       setPlayingId(null);
@@ -71,8 +67,10 @@ export default function RecordingsPage() {
         text: '删除',
         style: 'destructive',
         onPress: async () => {
-          if (!user) return;
-          const ok = await deleteRecording(user, item.name);
+          // 从 Storage 路径中提取文件名
+          const filename = item.url.split('/').pop() || '';
+          const storagePath = `${user?.id}/${filename.replace(/\?.*$/, '')}`;
+          const ok = await deleteRecording(item.id, storagePath);
           if (ok) {
             setRecordings((prev) => prev.filter((r) => r.id !== item.id));
           } else {
@@ -90,6 +88,12 @@ export default function RecordingsPage() {
     } catch {
       return iso;
     }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 85) return '#22C55E';
+    if (score >= 65) return '#F59E0B';
+    return '#EF4444';
   };
 
   if (!user) {
@@ -145,9 +149,14 @@ export default function RecordingsPage() {
                   <Text style={s.playIconText}>{playingId === item.id ? '⏸' : '▶'}</Text>
                 </View>
                 <View style={s.info}>
-                  <Text style={s.name} numberOfLines={1}>
-                    {item.pinyin || '录音'}
-                  </Text>
+                  <View style={s.nameRow}>
+                    <Text style={s.name}>{item.pinyin}</Text>
+                    <View style={[s.scoreBadge, { backgroundColor: getScoreColor(item.score) + '20' }]}>
+                      <Text style={[s.scoreText, { color: getScoreColor(item.score) }]}>
+                        {item.score}分
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={s.date}>{formatDate(item.created_at)}</Text>
                 </View>
               </TouchableOpacity>
@@ -200,9 +209,16 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   playIconActive: { backgroundColor: '#8B5CF6' },
-  playIconText: { fontSize: 14, color: '#8B5CF6' },
+  playIconText: { fontSize: 14 },
   info: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
+  scoreBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  scoreText: { fontSize: 12, fontWeight: '600' },
   date: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
   deleteBtn: { padding: 8 },
   deleteText: { fontSize: 18 },

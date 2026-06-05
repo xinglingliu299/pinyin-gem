@@ -1,8 +1,10 @@
 /**
  * 录音存储服务
  *
- * 登录用户：录音上传到 Supabase Storage
- * 游客用户：仅本地（返回提示信息）
+ * 登录用户：录音上传到 Supabase Storage + 元数据写入 user_recordings 表
+ * 游客用户：仅本地（不保存）
+ *
+ * 业务规则：每个拼音只保留最高分的录音（由 saveRecording 内部处理）
  */
 
 import { supabase } from '@/lib/supabase';
@@ -12,86 +14,122 @@ const BUCKET = 'recordings';
 
 export interface RecordingItem {
   id: string;
-  name: string;
+  level_id: string;
   pinyin: string;
   url: string;
-  created_at: string;
+  score: number;
   duration?: number;
+  created_at: string;
 }
 
 /**
- * 上传录音到 Supabase Storage
+ * 上传录音到 Supabase Storage，并保存元数据到 user_recordings 表
+ * 内部自动处理：同一拼音只保留最高分录音
+ *
+ * @param user 登录用户
+ * @param blob 录音文件 Blob
+ * @param levelId 拼音级别 id，如 'b', 'ai'
+ * @param pinyin 拼音，如 'bō'
+ * @param score 发音评分 0-100
+ * @param duration 录音时长（秒）
+ * @returns 是否成功保存（分数不高时也可能返回 false）
  */
-export async function uploadRecording(
+export async function saveRecording(
   user: User,
   blob: Blob,
-  filename: string,
-): Promise<string | null> {
+  levelId: string,
+  pinyin: string,
+  score: number,
+  duration?: number,
+): Promise<{ saved: boolean; url?: string }> {
   try {
-    const path = `${user.id}/${Date.now()}_${filename}.webm`;
-    const { error } = await supabase.storage
+    // 1. 上传到 Storage
+    const path = `${user.id}/${Date.now()}_${levelId}.webm`;
+    const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(path, blob, {
         contentType: blob.type || 'audio/webm',
         upsert: false,
       });
 
-    if (error) {
-      console.warn('[Storage] upload failed:', error.message);
-      return null;
+    if (uploadError) {
+      console.warn('[Storage] upload failed:', uploadError.message);
+      return { saved: false };
     }
 
-    // 获取公共 URL
+    // 2. 获取公共 URL
     const {
       data: { publicUrl },
     } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    return publicUrl;
+
+    // 3. 调用 RPC 保存元数据（内部自动去重：只保留最高分）
+    const { data, error: rpcError } = await supabase.rpc('save_user_recording', {
+      p_level_id: levelId,
+      p_pinyin: pinyin,
+      p_storage_path: path,
+      p_public_url: publicUrl,
+      p_score: score,
+      p_duration: duration ?? null,
+    });
+
+    if (rpcError) {
+      console.warn('[RPC] save_user_recording failed:', rpcError.message);
+      // Storage 已上传，RPC 失败仍视为部分成功
+      return { saved: false };
+    }
+
+    console.log('[Recording] saved:', data);
+    return { saved: data?.saved === true, url: publicUrl };
   } catch (e) {
-    console.warn('[Storage] upload failed:', e);
-    return null;
+    console.warn('[Storage] saveRecording failed:', e);
+    return { saved: false };
   }
 }
 
 /**
- * 列出用户的所有录音
+ * 获取当前用户的所有录音（只返回每个拼音最高分的那条）
  */
-export async function listRecordings(user: User): Promise<RecordingItem[]> {
+export async function listRecordings(): Promise<RecordingItem[]> {
   try {
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .list(user.id, {
-        sortBy: { column: 'created_at', order: 'desc' },
-        limit: 100,
-      });
+    const { data, error } = await supabase.rpc('get_user_recordings');
+    if (error || !data) {
+      console.warn('[RPC] get_user_recordings failed:', error?.message);
+      return [];
+    }
 
-    if (error || !data) return [];
-
-    return data.map((item) => {
-      const { data: urlData } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(`${user.id}/${item.name}`);
-      return {
-        id: item.id!,
-        name: item.name,
-        pinyin: item.metadata?.pinyin || '',
-        url: urlData.publicUrl,
-        created_at: item.created_at || '',
-      };
-    });
+    const list = Array.isArray(data) ? data : [];
+    return list.map((item: any) => ({
+      id: item.id ?? '',
+      level_id: item.level_id ?? '',
+      pinyin: item.pinyin ?? '',
+      url: item.public_url ?? '',
+      score: item.score ?? 0,
+      duration: item.duration ?? undefined,
+      created_at: item.created_at ?? '',
+    }));
   } catch (e) {
-    console.warn('[Storage] list failed:', e);
+    console.warn('[RPC] get_user_recordings failed:', e);
     return [];
   }
 }
 
 /**
- * 删除录音
+ * 删除录音（Storage 文件 + user_recordings 记录）
  */
-export async function deleteRecording(user: User, filename: string): Promise<boolean> {
+export async function deleteRecording(recordingId: string, storagePath: string): Promise<boolean> {
   try {
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .remove([`${user.id}/${filename}`]);
+    // 1. 删除 Storage 文件
+    await supabase.storage.from(BUCKET).remove([storagePath]);
+
+    // 2. 删除数据库记录（通过 RPC，带 auth 验证）
+    const { error } = await supabase.rpc('delete_user_recording_by_id', {
+      p_recording_id: recordingId,
+    });
+
+    if (error) {
+      console.warn('[RPC] delete failed:', error.message);
+    }
+
     return !error;
   } catch {
     return false;

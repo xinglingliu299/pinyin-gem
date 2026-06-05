@@ -8,6 +8,8 @@ import { PrimaryButton, SecondaryButton, LearnTopBar } from '@/components';
 import { getLevelById } from '@/data/curriculum';
 import { startRecording, stopRecording, cleanupRecording } from '@/services/audio';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useAuth } from '@/services/auth';
+import { saveRecording } from '@/services/recording';
 
 // ---- 评分工具 ----
 
@@ -30,6 +32,7 @@ function getMessage(stars: number): string {
 
 export default function PracticePage() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
   const level = getLevelById(id ?? 'b');
 
   const [recording, setRecording] = useState(false);
@@ -55,10 +58,23 @@ export default function PracticePage() {
       timer = setTimeout(async () => {
         try {
           const result = await stopRecording();
-          setConfidence(result.confidence);
+          const finalConfidence = result.confidence;
+          setConfidence(finalConfidence);
           setHasResult(true);
           setRecording(false);
           setRecordedUri(result.uri);
+
+          // 自动上传到云端（登录用户）
+          if (user && level) {
+            try {
+              const { uri } = result;
+              const blob = await fetch(uri).then(r => r.blob());
+              await saveRecording(user, blob, level.id, level.pinyin, finalConfidence);
+            } catch (uploadErr) {
+              // 上传失败静默，不影响用户操作
+              console.warn('[Practice] 录音上传失败:', uploadErr);
+            }
+          }
         } catch (e) {
           setErrorMsg('录音自动停止');
           setRecording(false);
@@ -66,7 +82,7 @@ export default function PracticePage() {
       }, 4000); // 4 秒超时
     }
     return () => clearTimeout(timer);
-  }, [recording]);
+  }, [recording, user, level]);
 
   // 组件卸载时清理
   useEffect(() => {
@@ -81,10 +97,22 @@ export default function PracticePage() {
       // 手动停止录音
       try {
         const result = await stopRecording();
-        setConfidence(result.confidence);
+        const finalConfidence = result.confidence;
+        setConfidence(finalConfidence);
         setHasResult(true);
         setRecording(false);
         setRecordedUri(result.uri);
+
+        // 自动上传到云端（登录用户）
+        if (user && level) {
+          try {
+            const { uri } = result;
+            const blob = await fetch(uri).then(r => r.blob());
+            await saveRecording(user, blob, level.id, level.pinyin, finalConfidence);
+          } catch (uploadErr) {
+            console.warn('[Practice] 录音上传失败:', uploadErr);
+          }
+        }
       } catch (e: any) {
         setErrorMsg(e?.message || '录音停止失败');
         setRecording(false);
@@ -105,7 +133,7 @@ export default function PracticePage() {
       // 权限拒绝等错误已在 audio.ts 中弹窗提示
       setErrorMsg(e?.message || '录音启动失败');
     }
-  }, [recording]);
+  }, [recording, user, level]);
 
   const handlePlayRecording = useCallback(async () => {
     if (!recordedUri || isPlayingBack) return;
