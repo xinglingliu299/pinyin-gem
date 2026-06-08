@@ -186,6 +186,7 @@ function getAudioUrl(audioKey: string): string {
 
 /**
  * 通过 HTML5 Audio 播放音频文件
+ * 手机浏览器修复：play() 必须在用户点击回调内同步调用，不能延迟到事件回调中
  * @returns true 表示播放成功，false 表示失败
  */
 function playAudioFile(url: string): Promise<boolean> {
@@ -216,26 +217,35 @@ function playAudioFile(url: string): Promise<boolean> {
         done(false);
       }, 8000);
 
+      // onerror 任何加载错误都视为失败
       audio.onerror = () => {
         console.warn('[audio] 加载失败:', url);
         done(false);
       };
 
-      audio.oncanplaythrough = () => {
-        audio.play().then(() => {
-          done(true); // 播放启动成功
-        }).catch((err) => {
-          console.warn('[audio] play() 被拒绝:', err.message);
-          done(false);
-        });
-      };
-
+      // 播放结束
       audio.onended = () => {
         currentAudio = null;
       };
 
+      // oncanplaythrough 通知可以流畅播放，但 play() 已在 load() 后同步调用
+      audio.oncanplaythrough = () => {
+        // 播放已在 load() 后同步启动，这里仅记录
+      };
+
+      // 关键修复：先设置 src，再 load()，然后立即 play()
+      // 手机浏览器要求 play() 必须在用户交互回调内同步调用，不能放到异步事件里
       audio.src = url;
       audio.load();
+
+      // 立即尝试播放（同步调用，符合手机浏览器策略）
+      audio.play().then(() => {
+        done(true); // 播放启动成功
+      }).catch((err) => {
+        // 可能失败：手机浏览器未授权 / 离线 / 文件不存在
+        console.warn('[audio] play() 被拒绝:', err.message, 'url:', url);
+        done(false);
+      });
     } catch (err) {
       console.warn('[audio] 创建 Audio 失败:', err);
       resolve(false);
