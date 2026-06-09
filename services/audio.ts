@@ -228,23 +228,24 @@ function playAudioFile(url: string): Promise<boolean> {
         currentAudio = null;
       };
 
-      // oncanplaythrough 通知可以流畅播放，但 play() 已在 load() 后同步调用
+      // oncanplaythrough — 加载完成后播放（作为首次 play() 失败的后备）
       audio.oncanplaythrough = () => {
-        // 播放已在 load() 后同步启动，这里仅记录
+        if (!settled) {
+          audio.play().then(() => done(true)).catch((err) => {
+            console.warn('[audio] 后备 play() 仍被拒绝:', err.message);
+            done(false);
+          });
+        }
       };
 
-      // 关键修复：先设置 src，再 load()，然后立即 play()
-      // 手机浏览器要求 play() 必须在用户交互回调内同步调用，不能放到异步事件里
       audio.src = url;
       audio.load();
 
-      // 立即尝试播放（同步调用，符合手机浏览器策略）
-      audio.play().then(() => {
-        done(true); // 播放启动成功
-      }).catch((err) => {
-        // 可能失败：手机浏览器未授权 / 离线 / 文件不存在
-        console.warn('[audio] play() 被拒绝:', err.message, 'url:', url);
-        done(false);
+      // 首次 play()：在用户交互回调内同步调用，满足手机 autoplay 策略
+      // 如果音频已缓存会直接成功；如果未加载完成会抛出
+      audio.play().then(() => done(true)).catch((err) => {
+        // 不立即放弃，等 oncanplaythrough 重试（大多数失败是因未加载完成）
+        console.warn('[audio] 首次 play() 未就绪，等待加载后再试:', err.message);
       });
     } catch (err) {
       console.warn('[audio] 创建 Audio 失败:', err);
