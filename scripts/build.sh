@@ -11,10 +11,15 @@ rm -rf dist docs
 echo "=== 2. Expo Web 构建 ==="
 npx expo export --platform web
 
-echo "=== 3. 复制音频文件到构建产物 ==="
+echo "=== 3. 复制音频和视频文件到构建产物 ==="
 mkdir -p dist/assets/audio
 cp assets/audio/*.mp3 dist/assets/audio/
 echo "已复制 $(ls dist/assets/audio/*.mp3 | wc -l) 个音频文件"
+if [ -d assets/video ]; then
+  mkdir -p dist/assets/video
+  cp assets/video/*.mp4 dist/assets/video/ 2>/dev/null || true
+  echo "已复制 $(ls dist/assets/video/*.mp4 2>/dev/null | wc -l) 个视频文件"
+fi
 
 echo "=== 4. 准备 GitHub Pages ==="
 mv dist docs
