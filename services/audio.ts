@@ -206,7 +206,7 @@ function playAudioFile(url: string): Promise<boolean> {
         currentAudio = null;
       }
 
-      const audio = new Audio();
+      const audio = new window.Audio();
       currentAudio = audio;
       let settled = false;
 
