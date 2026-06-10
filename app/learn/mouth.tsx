@@ -6,7 +6,7 @@ import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants
 import { PrimaryButton, LearnTopBar } from '@/components';
 import { getLevelById } from '@/data/curriculum';
 import { useResponsive } from '@/hooks/useResponsive';
-import { playPinyin } from '@/services/audio';
+import { playPinyin, getMouthVideoUrl } from '@/services/audio';
 
 // 口型数据映射
 type MouthConfig = {
@@ -408,6 +408,162 @@ const mirrorStyles = StyleSheet.create({
   },
 });
 
+// ---- 口型视频示范组件 ----
+function MouthVideoPlayer({ videoUrl, onClose }: { videoUrl: string; onClose: () => void }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1, duration: 300, useNativeDriver: true,
+    }).start();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      setError('视频示范仅在浏览器中可用');
+      return;
+    }
+    // 等 DOM 就绪后创建 video 元素
+    const timer = setTimeout(() => {
+      const container = document.getElementById('mouth-video-container');
+      if (!container) return;
+      const video = document.createElement('video');
+      video.src = videoUrl;
+      video.autoplay = true;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.controls = true;
+      video.setAttribute('playsinline', '');
+      video.style.cssText = 'width:100%;height:100%;object-fit:contain;border-radius:16px;background:#000;';
+      video.setAttribute('data-mouth-video', 'true');
+      container.appendChild(video);
+      videoRef.current = video;
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [videoUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = '';
+        videoRef.current.remove();
+        videoRef.current = null;
+      }
+      const container = document.getElementById('mouth-video-container');
+      if (container) {
+        const v = container.querySelector('[data-mouth-video]');
+        if (v) v.remove();
+      }
+    };
+  }, []);
+
+  return (
+    <Animated.View style={[videoStyles.overlay, { opacity: fadeAnim }]}>
+      <TouchableOpacity style={videoStyles.backdrop} activeOpacity={1} onPress={onClose} />
+      <View style={videoStyles.panel}>
+        <View style={videoStyles.titleRow}>
+          <Text style={videoStyles.title}>👄 口型示范</Text>
+          <TouchableOpacity style={videoStyles.closeX} onPress={onClose}>
+            <Text style={videoStyles.closeXText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 视频区域 */}
+        <View style={videoStyles.videoFrame}>
+          {/* @ts-ignore */}
+          <View nativeID="mouth-video-container" style={videoStyles.videoArea}>
+            {error && (
+              <View style={videoStyles.errorWrap}>
+                <Text style={videoStyles.errorEmoji}>📹</Text>
+                <Text style={videoStyles.errorText}>{error}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <Text style={videoStyles.hint}>跟着视频一起做口型，多练习几次！</Text>
+
+        <TouchableOpacity style={videoStyles.closeBtn} onPress={onClose}>
+          <Text style={videoStyles.closeBtnText}>关闭</Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
+
+const videoStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject, zIndex: 100,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  panel: {
+    backgroundColor: Colors.pureWhite, borderRadius: 28,
+    padding: 20, alignItems: 'center', gap: 14,
+    width: '92%', maxWidth: 440,
+    shadowColor: 'rgba(140,92,245,0.20)',
+    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 24, elevation: 10,
+  },
+  titleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%',
+  },
+  title: {
+    fontFamily: FontFamily.primary, fontSize: 20, fontWeight: "800",
+    color: Colors.magicPurple,
+  },
+  closeX: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: Colors.glowPurple,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  closeXText: {
+    fontSize: 14, fontWeight: "700", color: Colors.magicPurple,
+  },
+  videoFrame: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  videoArea: {
+    width: '100%',
+    height: 280,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 16,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorWrap: {
+    alignItems: 'center', gap: 8, paddingHorizontal: 24,
+  },
+  errorEmoji: { fontSize: 36 },
+  errorText: {
+    fontFamily: FontFamily.primary, fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+  },
+  hint: {
+    fontFamily: FontFamily.primary, fontSize: 14, fontWeight: "600",
+    color: Colors.stagePink, textAlign: 'center',
+    paddingHorizontal: 12,
+  },
+  closeBtn: {
+    backgroundColor: Colors.magicPurple, borderRadius: 20,
+    paddingVertical: 12, paddingHorizontal: 32,
+  },
+  closeBtnText: {
+    fontFamily: FontFamily.primary, fontSize: 15, fontWeight: "600",
+    color: Colors.pureWhite,
+  },
+});
+
 // ========================
 // Main Page
 // ========================
@@ -416,11 +572,13 @@ export default function MouthPage() {
   const level = getLevelById(id ?? 'a');
   const { cardWidth, fontSizeMultiplier } = useResponsive();
   const [showMirror, setShowMirror] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   const [playing, setPlaying] = useState(false);
 
   if (!level) return null;
 
   const mouthConfig = detectMouthConfig(level.letter, level.mouthGuide);
+  const mouthVideoUrl = getMouthVideoUrl(level.id);
 
   const handlePlay = async () => {
     setPlaying(true);
@@ -463,6 +621,23 @@ export default function MouthPage() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* 看口型示范 - 视频按钮 */}
+        <TouchableOpacity
+          style={[styles.videoBtn, { width: cardWidth }]}
+          activeOpacity={0.8}
+          onPress={() => setShowVideo(true)}
+        >
+          <Text style={styles.videoEmoji}>🎬</Text>
+          <View style={styles.videoTextWrap}>
+            <Text style={[styles.videoTextMain, { fontSize: 16 * fontSizeMultiplier }]}>
+              看口型示范视频
+            </Text>
+            <Text style={styles.videoTextSub}>
+              跟着老师的嘴巴一起做
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         {/* 口型指导 */}
         <View style={styles.guideBox}>
@@ -507,6 +682,9 @@ export default function MouthPage() {
 
       {showMirror && (
         <CameraMirror config={mouthConfig} onClose={() => setShowMirror(false)} />
+      )}
+      {showVideo && mouthVideoUrl && (
+        <MouthVideoPlayer videoUrl={mouthVideoUrl} onClose={() => setShowVideo(false)} />
       )}
     </View>
   );
@@ -581,6 +759,25 @@ const styles = StyleSheet.create({
     color: Colors.pureWhite,
   },
   mirrorTextSub: {
+    fontFamily: FontFamily.primary, fontSize: 12, fontWeight: "400",
+    color: 'rgba(255,255,255,0.75)',
+  },
+  videoBtn: {
+    height: 'auto',
+    backgroundColor: '#FF6B8A', borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16, paddingHorizontal: 20,
+    shadowColor: 'rgba(255,107,138,0.30)',
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12, elevation: 4,
+  },
+  videoEmoji: { fontSize: 28 },
+  videoTextWrap: { flex: 1, gap: 2 },
+  videoTextMain: {
+    fontFamily: FontFamily.primary, fontWeight: "600",
+    color: Colors.pureWhite,
+  },
+  videoTextSub: {
     fontFamily: FontFamily.primary, fontSize: 12, fontWeight: "400",
     color: 'rgba(255,255,255,0.75)',
   },

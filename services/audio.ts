@@ -162,7 +162,43 @@ const LETTER_TTS_FALLBACK: Record<string, string> = {
 };
 
 // 音频缓存版本号 — 音频文件更新时手动递增，强制浏览器重新下载
-const AUDIO_CACHE_VERSION = 2;
+export const AUDIO_CACHE_VERSION = 2;
+
+/**
+ * 获取视频文件路径
+ */
+function getVideoUrl(videoKey: string): string {
+  try {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      const segments = pathname.split('/').filter(Boolean);
+      let base: string;
+      if (segments.length >= 1 && segments[0] === 'pinyin-gem') {
+        base = `/pinyin-gem/assets/video/${videoKey}.mp4`;
+      } else {
+        base = `/assets/video/${videoKey}.mp4`;
+      }
+      return `${base}?v=${AUDIO_CACHE_VERSION}`;
+    }
+  } catch {
+    // ignore
+  }
+  return `/pinyin-gem/assets/video/${videoKey}.mp4?v=${AUDIO_CACHE_VERSION}`;
+}
+
+// 口型视频映射：关卡ID -> 视频文件名
+const MOUTH_VIDEO_MAP: Record<string, string> = {
+  'a': 'mouth_a', 'o': 'mouth_o', 'e': 'mouth_e',
+};
+
+/**
+ * 获取口型示范视频 URL
+ */
+export function getMouthVideoUrl(levelId: string): string | null {
+  const videoKey = MOUTH_VIDEO_MAP[levelId];
+  if (!videoKey) return null;
+  return getVideoUrl(videoKey);
+}
 
 /**
  * 获取音频文件路径
