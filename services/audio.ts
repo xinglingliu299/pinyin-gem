@@ -161,9 +161,13 @@ const LETTER_TTS_FALLBACK: Record<string, string> = {
   'yue': '约', 'yun': '云',
 };
 
+// 音频缓存版本号 — 音频文件更新时手动递增，强制浏览器重新下载
+const AUDIO_CACHE_VERSION = 2;
+
 /**
  * 获取音频文件路径
  * 从当前页面 URL 自动推导 base path，不依赖任何全局变量
+ * 附加缓存版本号参数，防止浏览器播放旧版缓存
  */
 function getAudioUrl(audioKey: string): string {
   try {
@@ -173,15 +177,18 @@ function getAudioUrl(audioKey: string): string {
       // 例如 /pinyin-gem -> /pinyin-gem
       const pathname = window.location.pathname;
       const segments = pathname.split('/').filter(Boolean);
+      let base: string;
       if (segments.length >= 1 && segments[0] === 'pinyin-gem') {
-        return `/pinyin-gem/assets/audio/${audioKey}.mp3`;
+        base = `/pinyin-gem/assets/audio/${audioKey}.mp3`;
+      } else {
+        base = `/assets/audio/${audioKey}.mp3`;
       }
-      return `/assets/audio/${audioKey}.mp3`;
+      return `${base}?v=${AUDIO_CACHE_VERSION}`;
     }
   } catch {
     // ignore
   }
-  return `/pinyin-gem/assets/audio/${audioKey}.mp3`;
+  return `/pinyin-gem/assets/audio/${audioKey}.mp3?v=${AUDIO_CACHE_VERSION}`;
 }
 
 /**
