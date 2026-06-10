@@ -52,13 +52,13 @@ function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
       if (!container) return;
       const video = document.createElement('video');
       video.src = videoUrl;
-      video.autoplay = true;
-      video.muted = true;
+      video.autoplay = false;
+      video.muted = false;
       video.loop = true;
       video.playsInline = true;
-      video.controls = false;
+      video.controls = true;
       video.setAttribute('playsinline', '');
-      video.style.cssText = 'width:200px;height:200px;object-fit:cover;border-radius:100px;background:#1a1a2e;display:block;';
+      video.style.cssText = 'width:100%;height:280px;object-fit:contain;border-radius:16px;background:#1a1a2e;display:block;';
       video.setAttribute('data-mouth-inline', 'true');
       container.appendChild(video);
       videoRef.current = video;
@@ -88,7 +88,9 @@ function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
 
 const inlineVideoStyles = StyleSheet.create({
   wrapper: {
-    width: 200, height: 200, borderRadius: 100,
+    width: '100%',
+    height: 280,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1a1a2e',
   },
