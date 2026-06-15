@@ -568,7 +568,7 @@ export default function MouthPage() {
 
         <PrimaryButton
           title="我做到了！"
-          onPress={() => router.push(`/learn/tones?id=${level.id}`)}
+          onPress={() => router.push(`/learn/${level.type === 'initial' ? 'spell' : 'tones'}?id=${level.id}`)}
           style={styles.cta}
         />
       </ScrollView>
