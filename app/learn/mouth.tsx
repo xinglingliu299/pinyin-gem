@@ -46,10 +46,13 @@ function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    // 用 requestAnimationFrame 确保 DOM 就绪
-    const raf = requestAnimationFrame(() => {
+    // setTimeout 等待 React 完成 DOM 提交后再操作
+    const timer = setTimeout(() => {
       const container = document.getElementById('mouth-video-inline');
       if (!container) return;
+      // 移除已有视频（切换关卡时可能残留）
+      const old = container.querySelector('[data-mouth-inline]');
+      if (old) old.remove();
       const video = document.createElement('video');
       video.src = videoUrl;
       video.autoplay = false;
@@ -62,8 +65,8 @@ function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
       video.setAttribute('data-mouth-inline', 'true');
       container.appendChild(video);
       videoRef.current = video;
-    });
-    return () => cancelAnimationFrame(raf);
+    }, 50);
+    return () => clearTimeout(timer);
   }, [videoUrl]);
 
   useEffect(() => {
@@ -83,7 +86,7 @@ function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
   }, []);
 
   // @ts-ignore
-  return <View nativeID="mouth-video-inline" style={inlineVideoStyles.wrapper} />;
+  return <View id="mouth-video-inline" style={inlineVideoStyles.wrapper} />;
 }
 
 const inlineVideoStyles = StyleSheet.create({
