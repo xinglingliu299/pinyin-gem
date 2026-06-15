@@ -46,9 +46,10 @@ async function playThreeStepSpell(
   onStep('consonant');
   await play(`letter_${consonant}.mp3`);
 
-  // Step 2: 韵母
+  // Step 2: 韵母（ü 映射为 v）
   onStep('vowel');
-  await play(`tone_${vowel}1.mp3`);
+  const vowelKey = vowel === 'ü' ? 'v' : vowel;
+  await play(`tone_${vowelKey}1.mp3`);
 
   // Step 3: 拼读
   onStep('blend');
