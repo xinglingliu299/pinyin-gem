@@ -8,48 +8,66 @@ import { getLevelById } from '@/data/curriculum';
 import { useResponsive } from '@/hooks/useResponsive';
 import { playPinyin } from '@/services/audio';
 
-// 拼读音节音频文件名映射（edge-tts 预生成）
+// 三步拼读步骤状态
+type SpellStep = 'idle' | 'consonant' | 'vowel' | 'blend';
+
+const STEP_LABELS: Record<SpellStep, string> = {
+  idle: '',
+  consonant: '声母',
+  vowel: '韵母',
+  blend: '拼读',
+};
+
+// 三步拼读：声母 → 韵母 → 连读（带回调通知步骤）
+async function playThreeStepSpell(
+  consonant: string,
+  vowel: string,
+  syllable: string,
+  onStep: (step: SpellStep) => void,
+): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  const audioBase = () => {
+    const seg = window.location.pathname.split('/').filter(Boolean);
+    return seg.length >= 1 && seg[0] === 'pinyin-gem' ? '/pinyin-gem/assets/audio' : '/assets/audio';
+  };
+
+  const play = (src: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const a = new window.Audio();
+      a.src = `${audioBase()}/${src}?v=4`;
+      a.onended = () => resolve();
+      a.onerror = () => resolve();
+      a.play().catch(() => resolve());
+    });
+  };
+
+  // Step 1: 声母
+  onStep('consonant');
+  await play(`letter_${consonant}.mp3`);
+
+  // Step 2: 韵母
+  onStep('vowel');
+  await play(`tone_${vowel}1.mp3`);
+
+  // Step 3: 拼读
+  onStep('blend');
+  await play(spellToFilename(syllable));
+}
+
 function spellToFilename(pinyin: string): string {
   const map: Record<string, string> = {
-    'ā':'a1','ō':'o1','ē':'e1','ī':'i1','ū':'u1',
-    'á':'a2','ó':'o2','é':'e2','í':'i2','ú':'u2',
-    'ǎ':'a3','ǒ':'o3','ě':'e3','ǐ':'i3','ǔ':'u3',
-    'à':'a4','ò':'o4','è':'e4','ì':'i4','ù':'u4',
-    'ǖ':'v1','ǘ':'v2','ǚ':'v3','ǜ':'v4',
+    'ā': 'a1','ō': 'o1','ē': 'e1','ī': 'i1','ū': 'u1',
+    'á': 'a2','ó': 'o2','é': 'e2','í': 'i2','ú': 'u2',
+    'ǎ': 'a3','ǒ': 'o3','ě': 'e3','ǐ': 'i3','ǔ': 'u3',
+    'à': 'a4','ò': 'o4','è': 'e4','ì': 'i4','ù': 'u4',
+    'ǖ': 'v1','ǘ': 'v2','ǚ': 'v3','ǜ': 'v4',
   };
   let base = pinyin;
   for (const [k, v] of Object.entries(map)) {
     base = base.replace(k, v);
   }
   return `spell_${base}.mp3`;
-}
-
-function getAudioUrlBase(key: string): string {
-  try {
-    if (typeof window !== 'undefined') {
-      const segments = window.location.pathname.split('/').filter(Boolean);
-      if (segments.length >= 1 && segments[0] === 'pinyin-gem') {
-        return `/pinyin-gem/assets/audio/${key}`;
-      }
-      return `/assets/audio/${key}`;
-    }
-  } catch {}
-  return `/pinyin-gem/assets/audio/${key}`;
-}
-
-async function playSpellAudio(pinyin: string): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
-  return new Promise((resolve) => {
-    try {
-      const audio = new window.Audio();
-      audio.src = `${getAudioUrlBase(spellToFilename(pinyin))}?v=3`;
-      audio.onended = () => resolve(true);
-      audio.onerror = () => resolve(false);
-      audio.play().catch(() => resolve(false));
-    } catch {
-      resolve(false);
-    }
-  });
 }
 
 // 声母拼读数据：哪个声母 + 哪些韵母 = 哪些音节
@@ -88,6 +106,7 @@ function SpellCard({
   isHighlight,
   onPress,
   fontSizeMultiplier,
+  step,
 }: {
   consonant: string;
   vowel: string;
@@ -96,6 +115,7 @@ function SpellCard({
   isHighlight: boolean;
   onPress: () => void;
   fontSizeMultiplier: number;
+  step: SpellStep;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const [animating, setAnimating] = useState(false);
@@ -130,6 +150,18 @@ function SpellCard({
           </View>
         </View>
         {isHighlight && <Text style={cardStyles.badge}>本关</Text>}
+        {step !== 'idle' && (
+          <View style={cardStyles.stepBar}>
+            <Text style={cardStyles.stepText}>
+              {step === 'consonant' ? `「${consonant}」声母` : step === 'vowel' ? `「${vowel}」韵母` : `「${display}」拼读`}
+            </Text>
+            <View style={cardStyles.stepDots}>
+              <View style={[cardStyles.stepDot, step === 'consonant' ? cardStyles.stepDotActive : step === 'vowel' || step === 'blend' ? cardStyles.stepDotDone : {}]} />
+              <View style={[cardStyles.stepDot, step === 'vowel' ? cardStyles.stepDotActive : step === 'blend' ? cardStyles.stepDotDone : {}]} />
+              <View style={[cardStyles.stepDot, step === 'blend' ? cardStyles.stepDotActive : {}]} />
+            </View>
+          </View>
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -204,6 +236,40 @@ const cardStyles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.pureWhite,
   },
+  stepBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E0F0',
+  },
+  stepText: {
+    fontFamily: FontFamily.primary,
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.magicPurple,
+  },
+  stepDots: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  stepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E0D8F0',
+  },
+  stepDotActive: {
+    backgroundColor: Colors.magicPurple,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  stepDotDone: {
+    backgroundColor: '#B8A8D8',
+  },
 });
 
 // ========================
@@ -214,6 +280,7 @@ export default function SpellPage() {
   const level = getLevelById(id ?? 'b');
   const { cardWidth, fontSizeMultiplier } = useResponsive();
   const [activeSyllable, setActiveSyllable] = useState<string | null>(null);
+  const [spellStep, setSpellStep] = useState<SpellStep>('idle');
 
   if (!level || level.type !== 'initial') {
     // 不是声母，重定向到声调页面
@@ -225,17 +292,14 @@ export default function SpellPage() {
 
   const spellItems = SPELLING_DATA[level.letter] || [];
 
-  const handlePlay = async (syllable: string) => {
+  const handlePlay = async (syllable: string, vowel: string) => {
     if (activeSyllable) return;
     setActiveSyllable(syllable);
     try {
-      const ok = await playSpellAudio(syllable);
-      if (!ok) {
-        // 回退 TTS
-        await playPinyin(syllable, { rate: 0.5 });
-      }
+      await playThreeStepSpell(level.letter, vowel, syllable, setSpellStep);
     } catch {}
-    setTimeout(() => setActiveSyllable(null), 1500);
+    setSpellStep('idle');
+    setActiveSyllable(null);
   };
 
   return (
@@ -267,8 +331,9 @@ export default function SpellPage() {
                 syllable={item.syllable}
                 display={item.display}
                 isHighlight={isHighlight}
-                onPress={() => handlePlay(item.syllable)}
+                onPress={() => handlePlay(item.syllable, item.vowel)}
                 fontSizeMultiplier={fontSizeMultiplier}
+                step={isActive ? spellStep : 'idle'}
               />
             );
           })}
