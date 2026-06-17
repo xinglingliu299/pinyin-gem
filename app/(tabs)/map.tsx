@@ -10,10 +10,11 @@ import { useProgress } from '@/services/progress';
 // 节点类型
 type NodeStatus = 'done' | 'current' | 'locked';
 
-// 根据进度计算节点状态
-function getNodeStatus(globalIndex: number, completed: number): NodeStatus {
-  if (globalIndex < completed) return 'done';
-  if (globalIndex === completed) return 'current';
+// 根据 completedLevels（ID 数组）和当前关 ID 计算节点状态
+// currentLevelId：第一个未完成的关卡 ID
+function getNodeStatus(levelId: string, completedLevels: string[], currentLevelId: string | null): NodeStatus {
+  if (completedLevels.includes(levelId)) return 'done';
+  if (levelId === currentLevelId) return 'current';
   return 'locked';
 }
 
@@ -49,12 +50,12 @@ function LevelCircle({
 
 // 阶段分区
 function StageSection({
-  stage, levels, completedCount, startIndex,
+  stage, levels, completedLevels, currentLevelId,
 }: {
   stage: typeof STAGES[0];
   levels: LevelData[];
-  completedCount: number;
-  startIndex: number;
+  completedLevels: string[];
+  currentLevelId: string | null;
 }) {
   return (
     <View style={styles.section}>
@@ -68,9 +69,8 @@ function StageSection({
 
       {/* Nodes */}
       <View style={styles.nodesRow}>
-        {levels.map((level, i) => {
-          const globalIndex = startIndex + i;
-          const status = getNodeStatus(globalIndex, completedCount);
+        {levels.map((level) => {
+          const status = getNodeStatus(level.id, completedLevels, currentLevelId);
           return (
             <LevelCircle
               key={level.id}
@@ -92,19 +92,20 @@ export default function MapPage() {
   if (isLoading) return null;
 
   // 真实进度
-  const completedCount = progress.completedLevels.length;
+  const completedLevels = progress.completedLevels; // string[]（关卡 ID 数组）
+  const completedCount = completedLevels.length;
   const progressPercent = completedCount > 0
     ? Math.round((completedCount / TOTAL_LEVELS) * 100)
     : 0;
 
-  // 为每个阶段计算全局起始索引
-  let runningIndex = 0;
+  // 计算所有关卡的有序列表，找到第一个未完成的关卡作为 current
+  const allLevelsOrdered: LevelData[] = [];
   const stageData = STAGES.map((stage) => {
     const levels = getStageLevels(stage.id);
-    const startIndex = runningIndex;
-    runningIndex += levels.length;
-    return { stage, levels, startIndex };
+    allLevelsOrdered.push(...levels);
+    return { stage, levels };
   });
+  const currentLevelId = allLevelsOrdered.find((l) => !completedLevels.includes(l.id))?.id ?? null;
 
   return (
     <ScrollView
@@ -124,13 +125,13 @@ export default function MapPage() {
       </View>
 
       {/* Stage Sections */}
-      {stageData.map(({ stage, levels, startIndex }) => (
+      {stageData.map(({ stage, levels }) => (
         <StageSection
           key={stage.id}
           stage={stage}
           levels={levels}
-          completedCount={completedCount}
-          startIndex={startIndex}
+          completedLevels={completedLevels}
+          currentLevelId={currentLevelId}
         />
       ))}
     </ScrollView>

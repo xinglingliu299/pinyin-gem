@@ -41,18 +41,39 @@ function detectMouthConfig(letter: string, mouthGuide: string): MouthConfig {
 
 // ---- 嵌入式口型视频（直接嵌入卡片，无弹窗） ----
 function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  useEffect(() => {
+  // 清理视频元素
+  const cleanupVideo = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.src = '';
+      videoRef.current.remove();
+      videoRef.current = null;
+    }
+  }, []);
+
+  // ref callback：在 DOM 节点挂载时立即注入 video 元素
+  const setContainerRef = useCallback((node: any) => {
+    if (!node) return;
+    containerRef.current = node;
+
     if (Platform.OS !== 'web') return;
-    // setTimeout 等待 React 完成 DOM 提交后再操作
-    const timer = setTimeout(() => {
-      const container = document.getElementById('mouth-video-inline');
-      if (!container) return;
-      // 移除已有视频（切换关卡时可能残留）
-      const old = container.querySelector('[data-mouth-inline]');
+
+    // 用 setTimeout 确保 RN Web 完成 DOM 提交
+    setTimeout(() => {
+      // 获取真实 DOM 元素（RN Web 的 View ref 直接就是 HTMLElement）
+      const domNode: HTMLElement | null =
+        typeof node.getDOMNode === 'function'
+          ? node.getDOMNode()
+          : (node as unknown as HTMLElement);
+      if (!domNode) return;
+
+      // 移除旧的视频
+      const old = domNode.querySelector('[data-mouth-inline]');
       if (old) old.remove();
+
       const video = document.createElement('video');
       video.src = videoUrl;
       video.autoplay = false;
@@ -63,30 +84,50 @@ function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
       video.setAttribute('playsinline', '');
       video.style.cssText = 'width:100%;height:280px;object-fit:contain;border-radius:16px;background:#1a1a2e;display:block;';
       video.setAttribute('data-mouth-inline', 'true');
-      container.appendChild(video);
+      domNode.appendChild(video);
       videoRef.current = video;
     }, 50);
-    return () => clearTimeout(timer);
   }, [videoUrl]);
 
+  // videoUrl 变化时重建视频
+  useEffect(() => {
+    if (!containerRef.current || Platform.OS !== 'web') return;
+    const domNode: HTMLElement | null =
+      typeof containerRef.current.getDOMNode === 'function'
+        ? containerRef.current.getDOMNode()
+        : (containerRef.current as unknown as HTMLElement);
+    if (!domNode) return;
+
+    const old = domNode.querySelector('[data-mouth-inline]');
+    if (old) old.remove();
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current = null;
+    }
+
+    const video = document.createElement('video');
+    video.src = videoUrl;
+    video.autoplay = false;
+    video.muted = false;
+    video.loop = true;
+    video.playsInline = true;
+    video.controls = true;
+    video.setAttribute('playsinline', '');
+    video.style.cssText = 'width:100%;height:280px;object-fit:contain;border-radius:16px;background:#1a1a2e;display:block;';
+    video.setAttribute('data-mouth-inline', 'true');
+    domNode.appendChild(video);
+    videoRef.current = video;
+  }, [videoUrl]);
+
+  // 卸载时清理
   useEffect(() => {
     return () => {
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.src = '';
-        videoRef.current.remove();
-        videoRef.current = null;
-      }
-      const c = document.getElementById('mouth-video-inline');
-      if (c) {
-        const v = c.querySelector('[data-mouth-inline]');
-        if (v) v.remove();
-      }
+      cleanupVideo();
     };
-  }, []);
+  }, [cleanupVideo]);
 
   // @ts-ignore
-  return <View id="mouth-video-inline" style={inlineVideoStyles.wrapper} />;
+  return <View ref={setContainerRef} style={inlineVideoStyles.wrapper} />;
 }
 
 const inlineVideoStyles = StyleSheet.create({
