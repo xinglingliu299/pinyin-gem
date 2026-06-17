@@ -52,8 +52,9 @@ async function playAudio(src, btn) {
 }
 
 Promise.all(LETTERS.map(async (letter) => {
-  const pinyinUrl = `${BASE}/audio/pinyin_${letter}.mp3`;
-  const letterUrl = `${BASE}/audio/letter_${letter}.mp3`;
+  const ts = Date.now();
+  const pinyinUrl = `${BASE}/audio/pinyin_${letter}.mp3?v=${ts}`;
+  const letterUrl = `${BASE}/audio/letter_${letter}.mp3?v=${ts}`;
   const videoUrl = `${BASE}/video/mouth_${letter}.mp4`;
 
   // 探测文件是否存在
