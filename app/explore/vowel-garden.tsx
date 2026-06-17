@@ -10,7 +10,7 @@ import type { LevelData } from '@/data/types';
 // 韵母分组
 const VOWEL_GROUPS = [
   { name: '复韵母', desc: '两个元音组合在一起', range: [0, 7], color: '#ED4799' },
-  { name: '鼻韵母', desc: '带鼻音的韵母', range: [8, 13], color: '#F59E0A' },
+  { name: '鼻韵母', desc: '带鼻音的韵母', range: [8, 17], color: '#F59E0A' },
 ];
 
 export default function VowelGardenPage() {

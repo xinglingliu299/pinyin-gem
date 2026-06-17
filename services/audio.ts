@@ -51,11 +51,13 @@ const PINYIN_AUDIO_MAP: Record<string, string> = {
   'iē': 'pinyin_ie', 'üē': 'pinyin_ve', 'ér': 'pinyin_er',
   'ān': 'pinyin_an', 'ēn': 'pinyin_en', 'yīn': 'pinyin_in',
   'āng': 'pinyin_ang', 'ēng': 'pinyin_eng',
+  'wēn': 'pinyin_un', 'yūn': 'pinyin_vn', 'yīng': 'pinyin_ing', 'ōng': 'pinyin_ong',
   // 第四阶段：整体认读音节
   'zhī': 'pinyin_zh', 'chī': 'pinyin_ch', 'shī': 'pinyin_sh',
   'rì': 'pinyin_r', 'zì': 'pinyin_z', 'cí': 'pinyin_c',
   'sī': 'pinyin_s', 'yī': 'pinyin_y', 'wú': 'pinyin_w',
   'yǔ': 'pinyin_yu2', 'yè': 'pinyin_ye',
+  'yuē': 'pinyin_yue', 'yuān': 'pinyin_yuan',
 };
 
 // 例字 -> 音频文件名
@@ -77,11 +79,13 @@ const EXAMPLE_AUDIO_MAP: Record<string, string> = {
   '写': 'ex_ie', '月': 'ex_ve', '耳': 'ex_er',
   '天': 'ex_an', '门': 'ex_en', '林': 'ex_in',
   '羊': 'ex_ang', '风': 'ex_eng',
+  '温': 'ex_un', '晕': 'ex_vn', '英': 'ex_ing', '轰': 'ex_ong',
   // 第四阶段
   '蜘蛛': 'ex_zhi', '吃饭': 'ex_chi', '狮子': 'ex_shi',
   '日出': 'ex_ri', '写字': 'ex_zi', '瓷碗': 'ex_ci',
   '丝瓜': 'ex_si', '衣服': 'ex_yi', '跳舞': 'ex_wu',
   '下雨': 'ex_yu', '叶子': 'ex_ye',
+  '约': 'ex_yue', '冤': 'ex_yuan', '因': 'ex_yin', '鹰': 'ex_ying',
 };
 
 // 声调森林的4声映射
@@ -130,13 +134,14 @@ const LETTER_AUDIO_MAP: Record<string, string> = {
   'ie': 'letter_ie', 've': 'letter_ve', 'er': 'letter_er',
   'an': 'letter_an', 'en': 'letter_en', 'in': 'letter_in',
   'ang': 'letter_ang', 'eng': 'letter_eng',
+  'un': 'letter_un', 'vn': 'letter_vn', 'ing': 'letter_ing', 'ong': 'letter_ong',
   // 第四阶段：整体认读音节
   'zhi': 'letter_zhi', 'chi': 'letter_chi', 'shi': 'letter_shi',
   'ri': 'letter_ri', 'zi': 'letter_zi', 'ci': 'letter_ci',
   'si': 'letter_si', 'yi': 'letter_yi', 'wu': 'letter_wu',
   'yu': 'letter_yu', 'ye': 'letter_ye',
-  // 额外映射：快闪认读用到的组合
-  'yue': 'letter_ve', 'yun': 'letter_yu',
+  'yue': 'letter_yue', 'yun': 'letter_yun',
+  'yuan': 'letter_yuan', 'yin': 'letter_yin', 'ying': 'letter_ying',
 };
 
 // 字母回退 TTS 用中文文本（防止读成英文）
@@ -154,15 +159,17 @@ const LETTER_TTS_FALLBACK: Record<string, string> = {
   'ie': '耶', 've': '约', 'er': '耳',
   'an': '安', 'en': '恩', 'in': '因',
   'ang': '昂', 'eng': '鞥',
+  'un': '温', 'vn': '晕', 'ing': '英', 'ong': '轰',
   'zhi': '织', 'chi': '吃', 'shi': '狮',
   'ri': '日', 'zi': '字', 'ci': '瓷',
   'si': '丝', 'yi': '衣', 'wu': '无',
   'yu': '雨', 'ye': '夜',
-  'yue': '约', 'yun': '云',
+  'yue': '约', 'yun': '晕',
+  'yuan': '冤', 'yin': '因', 'ying': '鹰',
 };
 
 // 音频缓存版本号 — 音频文件更新时手动递增，强制浏览器重新下载
-export const AUDIO_CACHE_VERSION = 5;
+export const AUDIO_CACHE_VERSION = 7;
 
 /**
  * 获取视频文件路径
@@ -320,8 +327,10 @@ const PINYIN_TTS_FALLBACK: Record<string, string> = {
   'iē': '耶', 'üē': '约', 'ér': '耳',
   'ān': '安', 'ēn': '恩', 'yīn': '因',
   'āng': '昂', 'ēng': '鞥',
+  'wēn': '温', 'yūn': '晕', 'yīng': '英', 'ōng': '轰',
   'zì': '字', 'cí': '瓷', 'wú': '无',
   'yǔ': '雨', 'yè': '夜',
+  'yuē': '约', 'yuān': '冤',
 };
 
 // playPinyin 回退 TTS 用中文文本
