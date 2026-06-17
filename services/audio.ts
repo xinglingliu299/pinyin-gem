@@ -194,6 +194,8 @@ const MOUTH_VIDEO_MAP: Record<string, string> = {
   'd': 'mouth_d', 't': 'mouth_t', 'n': 'mouth_n', 'l': 'mouth_l',
   'g': 'mouth_g', 'k': 'mouth_k', 'h': 'mouth_h',
   'j': 'mouth_j', 'q': 'mouth_q', 'x': 'mouth_x',
+  'z': 'mouth_z', 'c': 'mouth_c', 's': 'mouth_s',
+  'zh': 'mouth_zh', 'ch': 'mouth_ch', 'sh': 'mouth_sh', 'r': 'mouth_r',
 };
 
 /**
