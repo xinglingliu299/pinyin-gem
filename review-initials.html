@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>声母音频视频审查</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f3ff; padding: 20px; }
+h1 { text-align: center; color: #6d28d9; margin-bottom: 8px; font-size: 24px; }
+.sub { text-align: center; color: #9ca3af; margin-bottom: 24px; font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; max-width: 1200px; margin: 0 auto; }
+.card { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.letter-badge { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #7c3aed, #a78bfa); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+.letter-info { flex: 1; }
+.letter-name { font-size: 18px; font-weight: 700; color: #1f2937; }
+.letter-pinyin { font-size: 13px; color: #6b7280; }
+.audio-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.audio-btn { flex: 1; padding: 10px 8px; border: 1.5px solid #e5e7eb; border-radius: 10px; background: #fafafc; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.audio-btn:hover { border-color: #7c3aed; background: #f5f3ff; }
+.audio-btn.playing { border-color: #7c3aed; background: #ede9fe; color: #6d28d9; }
+.audio-btn .icon { font-size: 16px; }
+.video-wrap { position: relative; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
+.video-wrap video { width: 100%; height: 200px; object-fit: contain; display: block; }
+.status-badge { position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: rgba(0,0,0,0.6); color: #fff; }
+.summary { text-align: center; margin-top: 24px; padding: 16px; background: #fff; border-radius: 12px; max-width: 1200px; margin: 24px auto 0; color: #6b7280; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>声母音频视频审查</h1>
+<p class="sub">g/k/h/j/q/x/z/c/s/zh/ch/sh/r/y/w — 共15个声母</p>
+
+<div class="grid" id="grid"></div>
+<div class="summary" id="summary"></div>
+
+<script>
+const BASE = 'assets';
+
+const LETTERS = [
+  'g','k','h','j','q','x','z','c','s','zh','ch','sh','r','y','w'
+];
+
+async function playAudio(src, btn) {
+  document.querySelectorAll('.audio-btn').forEach(b => b.classList.remove('playing'));
+  const audio = new Audio(src);
+  btn.classList.add('playing');
+  audio.onended = () => btn.classList.remove('playing');
+  audio.onerror = () => { btn.classList.remove('playing'); btn.style.opacity = '0.4'; };
+  try { await audio.play(); } catch(e) { btn.classList.remove('playing'); }
+}
+
+Promise.all(LETTERS.map(async (letter) => {
+  const pinyinUrl = `${BASE}/audio/pinyin_${letter}.mp3`;
+  const letterUrl = `${BASE}/audio/letter_${letter}.mp3`;
+  const videoUrl = `${BASE}/video/mouth_${letter}.mp4`;
+
+  // 探测文件是否存在
+  const checks = await Promise.all([
+    fetch(pinyinUrl, { method: 'HEAD' }).then(r => r.ok).catch(() => false),
+    fetch(letterUrl, { method: 'HEAD' }).then(r => r.ok).catch(() => false),
+    fetch(videoUrl, { method: 'HEAD' }).then(r => r.ok).catch(() => false),
+  ]);
+
+  const [hasPinyin, hasLetter, hasVideo] = checks;
+  const pinyinText = letter === 'zh' ? 'zhī' : letter === 'ch' ? 'chī' : letter === 'sh' ? 'shī' :
+    letter === 'r' ? 'rì' : letter + (letter === 'y' ? 'ī' : letter === 'w' ? 'ū' : 'ē');
+  const fullPinyin = ['j','q','x','z','c','s','zh','ch','sh','r','y'].includes(letter) ? 
+    letter + 'ī' : (letter === 'w' ? 'wū' : letter + 'ē');
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="letter-badge">${letter}</div>
+      <div class="letter-info">
+        <div class="letter-name">${letter.toUpperCase()} ${letter}</div>
+        <div class="letter-pinyin">${fullPinyin} · ${getDesc(letter)}</div>
+      </div>
+    </div>
+    <div class="audio-row">
+      <button class="audio-btn" data-src="${pinyinUrl}" ${hasPinyin ? '' : 'disabled style="opacity:0.3"'}>
+        <span class="icon">🔊</span> 主发音
+      </button>
+      <button class="audio-btn" data-src="${letterUrl}" ${hasLetter ? '' : 'disabled style="opacity:0.3"'}>
+        <span class="icon">🐢</span> 慢读
+      </button>
+    </div>
+    <div class="video-wrap">
+      <video src="${videoUrl}" controls playsinline preload="metadata"></video>
+      <div class="status-badge">口型示范</div>
+    </div>
+  `;
+
+  card.querySelectorAll('.audio-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const src = btn.dataset.src;
+      if (src) playAudio(src, btn);
+    });
+  });
+
+  return { card, hasPinyin, hasLetter, hasVideo };
+})).then(cards => {
+  const grid = document.getElementById('grid');
+  cards.forEach(c => grid.appendChild(c.card));
+
+  const total = cards.length;
+  const okPinyin = cards.filter(c => c.hasPinyin).length;
+  const okLetter = cards.filter(c => c.hasLetter).length;
+  const okVideo = cards.filter(c => c.hasVideo).length;
+  document.getElementById('summary').innerHTML = 
+    `主发音 ${okPinyin}/${total} ✓ &nbsp;|&nbsp; 慢读 ${okLetter}/${total} ✓ &nbsp;|&nbsp; 口型视频 ${okVideo}/${total} ✓`;
+});
+
+function getDesc(letter) {
+  const desc = {
+    g:'舌根音', k:'舌根送气', h:'舌根擦音',
+    j:'舌面音', q:'舌面送气', x:'舌面擦音',
+    z:'舌尖前', c:'舌尖前送气', s:'舌尖前擦音',
+    zh:'翘舌音', ch:'翘舌送气', sh:'翘舌擦音', r:'翘舌浊音',
+    y:'开口口型', w:'圆唇口型'
+  };
+  return desc[letter] || '';
+}
+</script>
+
+</body>
+</html>
