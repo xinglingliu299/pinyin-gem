@@ -42,9 +42,9 @@ const PINYIN_AUDIO_MAP: Record<string, string> = {
   'dē': 'pinyin_d', 'tē': 'pinyin_t', 'nē': 'pinyin_n', 'lē': 'pinyin_l',
   'gē': 'pinyin_g', 'kē': 'pinyin_k', 'hē': 'pinyin_h',
   'jī': 'pinyin_j', 'qī': 'pinyin_q', 'xī': 'pinyin_x',
-  'zhī': 'pinyin_zhi', 'chī': 'pinyin_chi', 'shī': 'pinyin_shi',
-  'rì': 'pinyin_ri', 'zī': 'pinyin_zi2', 'cī': 'pinyin_ci',
-  'sī': 'pinyin_si', 'yī': 'pinyin_yi', 'wū': 'pinyin_wu',
+  'zhī': 'pinyin_zh', 'chī': 'pinyin_ch', 'shī': 'pinyin_sh',
+  'rì': 'pinyin_r', 'zī': 'pinyin_z', 'cī': 'pinyin_c',
+  'sī': 'pinyin_s', 'yī': 'pinyin_y', 'wū': 'pinyin_w',
   // 第三阶段：复韵母+鼻韵母
   'āi': 'pinyin_ai', 'ēi': 'pinyin_ei', 'uī': 'pinyin_ui',
   'āo': 'pinyin_ao', 'ōu': 'pinyin_ou', 'iū': 'pinyin_iu',
@@ -52,9 +52,9 @@ const PINYIN_AUDIO_MAP: Record<string, string> = {
   'ān': 'pinyin_an', 'ēn': 'pinyin_en', 'yīn': 'pinyin_in',
   'āng': 'pinyin_ang', 'ēng': 'pinyin_eng',
   // 第四阶段：整体认读音节
-  'zhī': 'pinyin_zhi', 'chī': 'pinyin_chi', 'shī': 'pinyin_shi',
-  'rì': 'pinyin_ri', 'zì': 'pinyin_zi2', 'cí': 'pinyin_ci',
-  'sī': 'pinyin_si', 'yī': 'pinyin_yi', 'wú': 'pinyin_wu',
+  'zhī': 'pinyin_zh', 'chī': 'pinyin_ch', 'shī': 'pinyin_sh',
+  'rì': 'pinyin_r', 'zì': 'pinyin_z', 'cí': 'pinyin_c',
+  'sī': 'pinyin_s', 'yī': 'pinyin_y', 'wú': 'pinyin_w',
   'yǔ': 'pinyin_yu2', 'yè': 'pinyin_ye',
 };
 
