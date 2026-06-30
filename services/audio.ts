@@ -169,7 +169,7 @@ const LETTER_TTS_FALLBACK: Record<string, string> = {
 };
 
 // 音频缓存版本号 — 音频文件更新时手动递增，强制浏览器重新下载
-export const AUDIO_CACHE_VERSION = 7;
+export const AUDIO_CACHE_VERSION = 8;
 
 /**
  * 获取视频文件路径
@@ -204,6 +204,7 @@ const MOUTH_VIDEO_MAP: Record<string, string> = {
   'z': 'mouth_z', 'c': 'mouth_c', 's': 'mouth_s',
   'zh': 'mouth_zh', 'ch': 'mouth_ch', 'sh': 'mouth_sh', 'r': 'mouth_r',
   'y': 'mouth_y', 'w': 'mouth_w',
+  'ai': 'mouth_ai', 'ei': 'mouth_ei', 'ui': 'mouth_ui',
 };
 
 /**
