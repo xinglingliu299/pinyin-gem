@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>复韵母音频视频审查 — ai ei ui ao ou iu</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f3ff; padding: 20px; }
+h1 { text-align: center; color: #6d28d9; margin-bottom: 8px; font-size: 24px; }
+.sub { text-align: center; color: #9ca3af; margin-bottom: 24px; font-size: 14px; }
+.section-title { max-width: 1200px; margin: 28px auto 12px; font-size: 18px; font-weight: 700; color: #374151; padding-left: 4px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; max-width: 1200px; margin: 0 auto; }
+.card { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.letter-badge { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; }
+.letter-info { flex: 1; }
+.letter-name { font-size: 18px; font-weight: 700; color: #1f2937; }
+.letter-pinyin { font-size: 13px; color: #6b7280; }
+.audio-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.audio-btn { flex: 1; padding: 10px 8px; border: 1.5px solid #e5e7eb; border-radius: 10px; background: #fafafc; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.audio-btn:hover { border-color: #f59e0b; background: #fffbeb; }
+.audio-btn.playing { border-color: #f59e0b; background: #fef3c7; color: #b45309; }
+.audio-btn .icon { font-size: 16px; }
+.tone-row { display: flex; gap: 6px; margin-bottom: 12px; }
+.audio-btn.tone { font-size: 12px; padding: 8px 6px; }
+.audio-btn.tone.playing { border-color: #7c3aed; background: #ede9fe; color: #6d28d9; }
+.video-wrap { position: relative; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
+.video-wrap video { width: 100%; height: 200px; object-fit: contain; display: block; }
+.summary { text-align: center; margin-top: 24px; padding: 16px; background: #fff; border-radius: 12px; max-width: 1200px; margin: 24px auto 0; color: #6b7280; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>复韵母音频视频审查</h1>
+<p class="sub">ai / ei / ui / ao / ou / iu — 共6个复韵母，从教学视频提取</p>
+
+<div class="section-title">📹 第一组：ai ei ui（第11集）</div>
+<div class="grid" id="grid1"></div>
+
+<div class="section-title">📹 第二组：ao ou iu（第12集）</div>
+<div class="grid" id="grid2"></div>
+
+<div class="summary" id="summary"></div>
+
+<script>
+const BASE = '.';
+
+const GROUP1 = ['ai', 'ei', 'ui'];
+const GROUP2 = ['ao', 'ou', 'iu'];
+
+async function playAudio(src, btn) {
+  document.querySelectorAll('.audio-btn').forEach(b => b.classList.remove('playing'));
+  const audio = new Audio(src);
+  btn.classList.add('playing');
+  audio.onended = () => btn.classList.remove('playing');
+  audio.onerror = () => { btn.classList.remove('playing'); btn.style.opacity = '0.4'; };
+  try { await audio.play(); } catch(e) { btn.classList.remove('playing'); }
+}
+
+async function buildCard(letter, pinyinLabel) {
+  const toneMap = { ai: 'āi ái ǎi ài', ei: 'ēi éi ěi èi', ui: 'uī uí uǐ uì', ao: 'āo áo ǎo ào', ou: 'ōu óu ǒu òu', iu: 'iū iú iǔ iù' };
+  const tones = toneMap[letter] ? toneMap[letter].split(' ') : [];
+  const toneLabels = ['一声', '二声', '三声', '四声'];
+
+  const pinyinUrl = `${BASE}/assets/audio/pinyin_${letter}.mp3`;
+  const letterUrl = `${BASE}/assets/audio/letter_${letter}.mp3`;
+  const videoUrl = `${BASE}/assets/video/mouth_${letter}.mp4`;
+
+  // 探测文件
+  const urls = [pinyinUrl, letterUrl, videoUrl];
+  for (let i = 1; i <= 4; i++) {
+    urls.push(`${BASE}/assets/audio/tone_${letter}${i}.mp3`);
+  }
+  const checks = await Promise.all(urls.map(u => fetch(u, { method: 'HEAD' }).then(r => r.ok).catch(() => false)));
+  const [hasPinyin, hasLetter, hasVideo, ...toneChecks] = checks;
+
+  const toneBtns = tones.map((t, i) => {
+    const url = `${BASE}/assets/audio/tone_${letter}${i + 1}.mp3`;
+    const ok = toneChecks[i];
+    return `<button class="audio-btn tone" onclick="playAudio('${url}', this)" ${!ok ? 'style="opacity:0.4"' : ''}>
+      <span class="icon">🔊</span> ${toneLabels[i]} ${t}
+    </button>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <div class="letter-badge">${letter}</div>
+        <div class="letter-info">
+          <div class="letter-name">${letter}</div>
+          <div class="letter-pinyin">${pinyinLabel}</div>
+        </div>
+      </div>
+      <div class="audio-row">
+        <button class="audio-btn" onclick="playAudio('${pinyinUrl}', this)" ${!hasPinyin ? 'style="opacity:0.4"' : ''}>
+          <span class="icon">🔊</span> 主发音
+        </button>
+        <button class="audio-btn" onclick="playAudio('${letterUrl}', this)" ${!hasLetter ? 'style="opacity:0.4"' : ''}>
+          <span class="icon">🔈</span> 慢读
+        </button>
+      </div>
+      <div class="tone-row">${toneBtns}</div>
+      <div class="video-wrap">
+        ${hasVideo
+          ? `<video src="${videoUrl}" controls playsinline preload="metadata"></video>`
+          : '<div style="height:200px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:14px">⚠️ 视频不存在</div>'}
+      </div>
+    </div>`;
+}
+
+(async () => {
+  let okCount = 0, failCount = 0;
+  const all = [...GROUP1, ...GROUP2];
+  const pinyinMap = { ai:'āi', ei:'ēi', ui:'uī', ao:'āo', ou:'ōu', iu:'iū' };
+
+  const cards1 = await Promise.all(GROUP1.map(l => buildCard(l, pinyinMap[l])));
+  document.getElementById('grid1').innerHTML = cards1.join('');
+
+  const cards2 = await Promise.all(GROUP2.map(l => buildCard(l, pinyinMap[l])));
+  document.getElementById('grid2').innerHTML = cards2.join('');
+
+  for (const l of all) {
+    const urls = [
+      `${BASE}/assets/audio/pinyin_${l}.mp3`,
+      `${BASE}/assets/audio/letter_${l}.mp3`,
+      `${BASE}/assets/video/mouth_${l}.mp4`,
+      `${BASE}/assets/audio/tone_${l}1.mp3`,
+      `${BASE}/assets/audio/tone_${l}2.mp3`,
+      `${BASE}/assets/audio/tone_${l}3.mp3`,
+      `${BASE}/assets/audio/tone_${l}4.mp3`,
+    ];
+    const results = await Promise.all(urls.map(u => fetch(u, {method:'HEAD'}).then(r=>r.ok).catch(()=>false)));
+    if (results.every(Boolean)) okCount++;
+    else failCount++;
+  }
+
+  document.getElementById('summary').innerHTML = `
+    ✅ ${okCount}/6 完整（主发音+慢读+口型视频+四声调齐全）<br>
+    ${failCount > 0 ? `⚠️ ${failCount} 个有缺失` : '🎉 全部就绪！'}
+  `;
+})();
+</script>
+</body>
+</html>

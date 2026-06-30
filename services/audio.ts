@@ -96,6 +96,13 @@ const TONE_AUDIO_MAP: Record<string, string> = {
   'ī': 'tone_i1', 'í': 'tone_i2', 'ǐ': 'tone_i3', 'ì': 'tone_i4',
   'ū': 'tone_u1', 'ú': 'tone_u2', 'ǔ': 'tone_u3', 'ù': 'tone_u4',
   'ǖ': 'tone_v1', 'ǘ': 'tone_v2', 'ǚ': 'tone_v3', 'ǜ': 'tone_v4',
+  // 复韵母四声（第11-12集提取）
+  'āi': 'tone_ai1', 'ái': 'tone_ai2', 'ǎi': 'tone_ai3', 'ài': 'tone_ai4',
+  'ēi': 'tone_ei1', 'éi': 'tone_ei2', 'ěi': 'tone_ei3', 'èi': 'tone_ei4',
+  'uī': 'tone_ui1', 'uí': 'tone_ui2', 'uǐ': 'tone_ui3', 'uì': 'tone_ui4',
+  'āo': 'tone_ao1', 'áo': 'tone_ao2', 'ǎo': 'tone_ao3', 'ào': 'tone_ao4',
+  'ōu': 'tone_ou1', 'óu': 'tone_ou2', 'ǒu': 'tone_ou3', 'òu': 'tone_ou4',
+  'iū': 'tone_iu1', 'iú': 'tone_iu2', 'iǔ': 'tone_iu3', 'iù': 'tone_iu4',
 };
 
 // 游戏音频映射
@@ -169,7 +176,7 @@ const LETTER_TTS_FALLBACK: Record<string, string> = {
 };
 
 // 音频缓存版本号 — 音频文件更新时手动递增，强制浏览器重新下载
-export const AUDIO_CACHE_VERSION = 8;
+export const AUDIO_CACHE_VERSION = 9;
 
 /**
  * 获取视频文件路径
