@@ -129,48 +129,44 @@ function ToneAnimation({
     outputRange: outputRangeY,
   });
 
-  // 路径线条样式
-  const getLineStyle = (): any => {
-    if (tone === 1) return {
-      position: 'absolute' as const, left: points[0].x, top: points[0].y - 2,
-      width: points[1].x - points[0].x, height: 4,
-      backgroundColor: config.color, borderRadius: 2,
-    };
-    if (tone === 2) return {
-      position: 'absolute' as const, left: points[0].x, top: points[1].y,
-      width: points[1].x - points[0].x, height: points[0].y - points[1].y,
-      backgroundColor: config.color, opacity: 0.5,
-    };
-    if (tone === 4) return {
-      position: 'absolute' as const, left: points[0].x, top: points[0].y,
-      width: points[1].x - points[0].x, height: points[1].y - points[0].y,
-      backgroundColor: config.color, opacity: 0.5,
-    };
-    // tone 3: V shape (use two rotated views)
-    return null;
+  // 渲染线段（统一用细线条 + rotate，不再用色块）
+  const renderLines = () => {
+    const lineThickness = tone === 1 ? 4 : 3.5;
+    return (
+      <>
+        {points.map((p, i) => {
+          if (i === points.length - 1) return null;
+          const next = points[i + 1];
+          const dx = next.x - p.x;
+          const dy = next.y - p.y;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          const midX = (p.x + next.x) / 2;
+          const midY = (p.y + next.y) / 2;
+          return (
+            <View
+              key={`line-${i}`}
+              style={{
+                position: 'absolute',
+                left: midX - length / 2,
+                top: midY - lineThickness / 2,
+                width: length,
+                height: lineThickness,
+                backgroundColor: config.color,
+                borderRadius: lineThickness / 2,
+                transform: [{ rotate: `${angle}deg` }],
+              }}
+            />
+          );
+        })}
+      </>
+    );
   };
 
   return (
     <View style={[animStyles.canvas, { width: canvasW, height: canvasH }]}>
       {/* 路径线条 */}
-      {tone !== 3 && getLineStyle() && <View style={getLineStyle()} />}
-      {tone === 3 && (
-        <>
-          {/* V shape - 用两个斜线 */}
-          <View style={{
-            position: 'absolute', left: points[0].x, top: points[0].y,
-            width: points[1].x - points[0].x, height: points[1].y - points[0].y,
-            backgroundColor: config.color, opacity: 0.5,
-            transform: [{ rotate: `${Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x) * 180 / Math.PI}deg` }],
-          }} />
-          <View style={{
-            position: 'absolute', left: points[1].x, top: points[1].y,
-            width: points[2].x - points[1].x, height: points[1].y - points[2].y,
-            backgroundColor: config.color, opacity: 0.5,
-            transform: [{ rotate: `${Math.atan2(points[2].y - points[1].y, points[2].x - points[1].x) * 180 / Math.PI}deg` }],
-          }} />
-        </>
-      )}
+      {renderLines()}
       {/* 动画圆点 */}
       {playing && (
         <Animated.View style={[
