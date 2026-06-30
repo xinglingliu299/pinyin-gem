@@ -6,7 +6,7 @@ import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants
 import { PrimaryButton, LearnTopBar } from '@/components';
 import { getLevelById } from '@/data/curriculum';
 import { useResponsive } from '@/hooks/useResponsive';
-import { playPinyin } from '@/services/audio';
+import { AUDIO_CACHE_VERSION } from '@/services/audio';
 
 // 三步拼读步骤状态
 type SpellStep = 'idle' | 'consonant' | 'vowel' | 'blend';
@@ -18,7 +18,49 @@ const STEP_LABELS: Record<SpellStep, string> = {
   blend: '拼读',
 };
 
-// 三步拼读：声母 → 韵母 → 连读（带回调通知步骤）
+// ---- 音频预加载 + 单例复用 ----
+const audioCache = new Map<string, HTMLAudioElement>();
+const preloadedSet = new Set<string>();
+
+function getAudioBase(): string {
+  if (typeof window === 'undefined') return '/assets/audio';
+  const seg = window.location.pathname.split('/').filter(Boolean);
+  return seg.length >= 1 && seg[0] === 'pinyin-gem' ? '/pinyin-gem/assets/audio' : '/assets/audio';
+}
+
+/** 预加载单个音频文件（非阻塞），已加载则跳过 */
+function preloadAudio(filename: string) {
+  if (typeof window === 'undefined' || preloadedSet.has(filename)) return;
+  preloadedSet.add(filename);
+  const a = new window.Audio();
+  a.preload = 'auto';
+  a.src = `${getAudioBase()}/${filename}?v=${AUDIO_CACHE_VERSION}`;
+  // 直接 load 触发下载（canplaythrough 后浏览器已缓存）
+  a.load();
+  audioCache.set(filename, a);
+}
+
+/** 播放已预加载的音频，未预加载则即时加载并播放 */
+function playCached(filename: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') { resolve(); return; }
+
+    // 优先用缓存实例，否则即时创建
+    let a = audioCache.get(filename) || new window.Audio();
+    if (!a.src.includes(filename)) {
+      a.src = `${getAudioBase()}/${filename}?v=${AUDIO_CACHE_VERSION}`;
+      a.load();
+    }
+
+    // 从头播放
+    a.currentTime = 0;
+    a.onended = () => { resolve(); };
+    a.onerror = () => { resolve(); };
+    a.play().catch(() => resolve());
+  });
+}
+
+// 三步拼读：声母 → 韵母 → 连读
 async function playThreeStepSpell(
   consonant: string,
   vowel: string,
@@ -27,33 +69,18 @@ async function playThreeStepSpell(
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
-  const audioBase = () => {
-    const seg = window.location.pathname.split('/').filter(Boolean);
-    return seg.length >= 1 && seg[0] === 'pinyin-gem' ? '/pinyin-gem/assets/audio' : '/assets/audio';
-  };
-
-  const play = (src: string): Promise<void> => {
-    return new Promise((resolve) => {
-      const a = new window.Audio();
-      a.src = `${audioBase()}/${src}?v=4`;
-      a.onended = () => resolve();
-      a.onerror = () => resolve();
-      a.play().catch(() => resolve());
-    });
-  };
-
   // Step 1: 声母
   onStep('consonant');
-  await play(`letter_${consonant}.mp3`);
+  await playCached(`letter_${consonant}.mp3`);
 
-  // Step 2: 韵母（ü 映射为 v）
+  // Step 2: 韵母
   onStep('vowel');
   const vowelKey = vowel === 'ü' ? 'v' : vowel;
-  await play(`tone_${vowelKey}1.mp3`);
+  await playCached(`tone_${vowelKey}1.mp3`);
 
   // Step 3: 拼读
   onStep('blend');
-  await play(spellToFilename(syllable));
+  await playCached(spellToFilename(syllable));
 }
 
 function spellToFilename(pinyin: string): string {
@@ -292,6 +319,19 @@ export default function SpellPage() {
   }
 
   const spellItems = SPELLING_DATA[level.letter] || [];
+
+  // 页面加载时预加载所有相关音频
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    // 声母音频
+    preloadAudio(`letter_${level.letter}.mp3`);
+    // 韵母及拼读音频
+    spellItems.forEach((item) => {
+      const vk = item.vowel === 'ü' ? 'v' : item.vowel;
+      preloadAudio(`tone_${vk}1.mp3`);
+      preloadAudio(spellToFilename(item.syllable));
+    });
+  }, [level.letter]);
 
   const handlePlay = async (syllable: string, vowel: string) => {
     if (activeSyllable) return;
