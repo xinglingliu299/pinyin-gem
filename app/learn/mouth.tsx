@@ -6,7 +6,7 @@ import { Colors, Spacing, FontSizes, FontWeights, FontFamily } from '@/constants
 import { PrimaryButton, LearnTopBar } from '@/components';
 import { getLevelById } from '@/data/curriculum';
 import { useResponsive } from '@/hooks/useResponsive';
-import { playPinyin, getMouthVideoUrl } from '@/services/audio';
+import { playPinyin, stopSpeaking, getMouthVideoUrl } from '@/services/audio';
 
 // 口型数据映射
 type MouthConfig = {
@@ -39,40 +39,94 @@ function detectMouthConfig(letter: string, mouthGuide: string): MouthConfig {
   return { label: '嘴巴圆圆的', width: 42, height: 42, roundness: 20, desc: '嘴唇收圆', cameraHint: '嘴唇收圆' };
 }
 
+// ---- 全局口型视频注册表（可靠停止机制） ----
+const _mouthCleaners = new Set<() => void>();
+export function stopAllMouthVideos() {
+  _mouthCleaners.forEach((fn) => { try { fn(); } catch (_) {} });
+  _mouthCleaners.clear();
+}
+
 // ---- 嵌入式口型视频（直接嵌入卡片，无弹窗） ----
 function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
-  const containerRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mountedRef = useRef(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const domNodeRef = useRef<HTMLElement | null>(null);
+  const cleanupRef = useRef<() => void>(() => {});
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
 
-  // 清理视频元素
+  // 清理视频元素（同步、彻底）
   const cleanupVideo = useCallback(() => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.src = '';
-      videoRef.current.remove();
-      videoRef.current = null;
+    // 取消尚未触发的定时器
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
+    // 停止并销毁当前视频
+    if (videoRef.current) {
+      const v = videoRef.current;
+      videoRef.current = null;
+      try {
+        v.pause();
+        v.controls = false; // 禁用控制条防止误触重播
+        v.muted = true;     // 立即静音
+        v.src = '';
+        v.removeAttribute('src');
+        v.load();
+        v.remove();
+      } catch (_) { /* 忽略 */ }
+    }
+    // 兜底清理
+    if (domNodeRef.current) {
+      domNodeRef.current.querySelectorAll('[data-mouth-inline]').forEach((el) => el.remove());
+    }
+    setLoadState('loading');
   }, []);
 
-  // ref callback：在 DOM 节点挂载时立即注入 video 元素
+  // 注册到全局停止表
+  useEffect(() => {
+    cleanupRef.current = cleanupVideo;
+    _mouthCleaners.add(cleanupRef.current);
+    return () => {
+      if (cleanupRef.current) {
+        _mouthCleaners.delete(cleanupRef.current);
+        cleanupRef.current(); // 卸载时自清理
+      }
+    };
+  }, [cleanupVideo]);
+
+  // ref callback：在 DOM 节点挂载时注入 video 元素
   const setContainerRef = useCallback((node: any) => {
-    if (!node) return;
-    containerRef.current = node;
+    if (!node) {
+      // node 为 null 表示组件正在卸载
+      cleanupVideo();
+      mountedRef.current = false;
+      domNodeRef.current = null;
+      return;
+    }
+    mountedRef.current = true;
+    setLoadState('loading');
 
     if (Platform.OS !== 'web') return;
 
-    // 用 setTimeout 确保 RN Web 完成 DOM 提交
-    setTimeout(() => {
-      // 获取真实 DOM 元素（RN Web 的 View ref 直接就是 HTMLElement）
-      const domNode: HTMLElement | null =
-        typeof node.getDOMNode === 'function'
-          ? node.getDOMNode()
-          : (node as unknown as HTMLElement);
-      if (!domNode) return;
+    // 取消之前的定时器
+    if (timerRef.current) clearTimeout(timerRef.current);
 
-      // 移除旧的视频
-      const old = domNode.querySelector('[data-mouth-inline]');
-      if (old) old.remove();
+    // 先清旧视频
+    cleanupVideo();
+
+    // 获取真实 DOM 节点
+    const domNode: HTMLElement | null =
+      typeof node.getDOMNode === 'function'
+        ? node.getDOMNode()
+        : (node as unknown as HTMLElement);
+    if (!domNode) return;
+    domNodeRef.current = domNode;
+
+    // 用 setTimeout 确保 RN Web 完成 DOM 提交
+    timerRef.current = setTimeout(() => {
+      // 关键：组件可能已在 50ms 内卸载，检查 mounted 标志
+      if (!mountedRef.current || !domNodeRef.current) return;
 
       const video = document.createElement('video');
       video.src = videoUrl;
@@ -82,52 +136,46 @@ function EmbeddedMouthVideo({ videoUrl }: { videoUrl: string }) {
       video.playsInline = true;
       video.controls = true;
       video.setAttribute('playsinline', '');
+      video.setAttribute('preload', 'metadata'); // 减少初始加载延迟
       video.style.cssText = 'width:100%;height:280px;object-fit:contain;border-radius:16px;background:#1a1a2e;display:block;';
       video.setAttribute('data-mouth-inline', 'true');
-      domNode.appendChild(video);
+
+      // 加载状态监听
+      video.onloadeddata = () => setLoadState('ready');
+      video.onerror = () => setLoadState('error');
+
+      domNodeRef.current.appendChild(video);
       videoRef.current = video;
-    }, 50);
-  }, [videoUrl]);
-
-  // videoUrl 变化时重建视频
-  useEffect(() => {
-    if (!containerRef.current || Platform.OS !== 'web') return;
-    const domNode: HTMLElement | null =
-      typeof containerRef.current.getDOMNode === 'function'
-        ? containerRef.current.getDOMNode()
-        : (containerRef.current as unknown as HTMLElement);
-    if (!domNode) return;
-
-    const old = domNode.querySelector('[data-mouth-inline]');
-    if (old) old.remove();
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current = null;
-    }
-
-    const video = document.createElement('video');
-    video.src = videoUrl;
-    video.autoplay = false;
-    video.muted = false;
-    video.loop = true;
-    video.playsInline = true;
-    video.controls = true;
-    video.setAttribute('playsinline', '');
-    video.style.cssText = 'width:100%;height:280px;object-fit:contain;border-radius:16px;background:#1a1a2e;display:block;';
-    video.setAttribute('data-mouth-inline', 'true');
-    domNode.appendChild(video);
-    videoRef.current = video;
-  }, [videoUrl]);
+      timerRef.current = null;
+    }, 100); // 增加到 100ms，给 RN Web 更充足时间
+  }, [videoUrl, cleanupVideo]);
 
   // 卸载时清理
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       cleanupVideo();
     };
   }, [cleanupVideo]);
 
   // @ts-ignore
-  return <View ref={setContainerRef} style={inlineVideoStyles.wrapper} />;
+  return (
+    <View ref={setContainerRef} style={inlineVideoStyles.wrapper}>
+      {loadState === 'loading' && Platform.OS === 'web' && (
+        <View style={inlineVideoStyles.loadingOverlay}>
+          <Text style={inlineVideoStyles.loadingEmoji}>🎬</Text>
+          <Text style={inlineVideoStyles.loadingText}>视频加载中...</Text>
+        </View>
+      )}
+      {loadState === 'error' && Platform.OS === 'web' && (
+        <View style={inlineVideoStyles.loadingOverlay}>
+          <Text style={inlineVideoStyles.loadingEmoji}>⚠️</Text>
+          <Text style={inlineVideoStyles.loadingText}>视频加载失败</Text>
+        </View>
+      )}
+    </View>
+  );
 }
 
 const inlineVideoStyles = StyleSheet.create({
@@ -137,6 +185,18 @@ const inlineVideoStyles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1a1a2e',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 16,
+    gap: 8,
+  },
+  loadingEmoji: { fontSize: 32 },
+  loadingText: {
+    fontFamily: FontFamily.primary, fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
   },
 });
 
@@ -537,6 +597,16 @@ export default function MouthPage() {
     setTimeout(() => setPlaying(false), 3000);
   };
 
+  const handleDone = () => {
+    stopSpeaking();
+    stopAllMouthVideos(); // 全局停止所有口型视频
+    const nextRoute = level.type === 'initial' ? 'spell' : 'tones';
+    // 用 requestAnimationFrame 确保视频清理在导航前完成
+    requestAnimationFrame(() => {
+      router.push(`/learn/${nextRoute}?id=${level.id}`);
+    });
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -609,7 +679,7 @@ export default function MouthPage() {
 
         <PrimaryButton
           title="我做到了！"
-          onPress={() => router.push(`/learn/${level.type === 'initial' ? 'spell' : 'tones'}?id=${level.id}`)}
+          onPress={handleDone}
           style={styles.cta}
         />
       </ScrollView>
