@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鼻韵母 & 复韵母 音频视频审查 — an en in · ie üe er</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f3ff; padding: 20px; }
+h1 { text-align: center; color: #6d28d9; margin-bottom: 8px; font-size: 24px; }
+.sub { text-align: center; color: #9ca3af; margin-bottom: 24px; font-size: 14px; }
+.section-title { max-width: 1200px; margin: 28px auto 12px; font-size: 18px; font-weight: 700; padding-left: 4px; }
+.section-title.g1 { color: #f59e0b; }
+.section-title.g2 { color: #7c3aed; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; max-width: 1200px; margin: 0 auto; }
+.card { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.letter-badge { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: #fff; }
+.badge-ve { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+.badge-an { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+.letter-info { flex: 1; }
+.letter-name { font-size: 18px; font-weight: 700; color: #1f2937; }
+.letter-pinyin { font-size: 13px; color: #6b7280; }
+.audio-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.audio-btn { flex: 1; padding: 10px 8px; border: 1.5px solid #e5e7eb; border-radius: 10px; background: #fafafc; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.audio-btn:hover { border-color: #f59e0b; background: #fffbeb; }
+.audio-btn.playing { border-color: #f59e0b; background: #fef3c7; color: #b45309; }
+.audio-btn .icon { font-size: 16px; }
+.tone-row { display: flex; gap: 6px; margin-bottom: 12px; }
+.audio-btn.tone { font-size: 12px; padding: 8px 6px; }
+.audio-btn.tone.playing { border-color: #7c3aed; background: #ede9fe; color: #6d28d9; }
+.video-wrap { position: relative; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
+.video-wrap video { width: 100%; height: 200px; object-fit: contain; display: block; }
+.summary { text-align: center; margin-top: 24px; padding: 16px; background: #fff; border-radius: 12px; max-width: 1200px; margin: 24px auto 0; color: #6b7280; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>鼻韵母 & 复韵母 音频视频审查</h1>
+<p class="sub">an · en · in（第14集）+ ie · üe · er（第13集）</p>
+
+<div class="section-title g1">📹 鼻韵母 an en in（第14集）</div>
+<div class="grid" id="grid1"></div>
+
+<div class="section-title g2">📹 复韵母 ie üe er（第13集）</div>
+<div class="grid" id="grid2"></div>
+
+<div class="summary" id="summary"></div>
+
+<script>
+const BASE = '.';
+
+const G1 = ['an', 'en', 'in'];
+const G2 = ['ie', 've', 'er'];
+const PMAP = { an:'ān', en:'ēn', in:'yīn', ie:'iē', ve:'üē', er:'ér' };
+const TONES = [['ā','á','ǎ','à'],['ē','é','ě','è'],['ī','í','ǐ','ì'],['iē','ié','iě','iè'],['üē','üé','üě','üè'],['ēr','ér','ěr','èr']];
+const TLABEL = ['一声','二声','三声','四声'];
+
+async function playAudio(src, btn) {
+  document.querySelectorAll('.audio-btn').forEach(b => b.classList.remove('playing'));
+  const a = new Audio(src);
+  btn.classList.add('playing');
+  a.onended = () => btn.classList.remove('playing');
+  a.onerror = () => { btn.classList.remove('playing'); btn.style.opacity = '0.4'; };
+  try { await a.play(); } catch(e) { btn.classList.remove('playing'); }
+}
+
+async function buildCard(letter, tones) {
+  const pU = `${BASE}/assets/audio/pinyin_${letter}.mp3`;
+  const lU = `${BASE}/assets/audio/letter_${letter}.mp3`;
+  const vU = `${BASE}/assets/video/mouth_${letter}.mp4`;
+
+  const urls = [pU, lU, vU];
+  for (let i = 1; i <= 4; i++) urls.push(`${BASE}/assets/audio/tone_${letter}${i}.mp3`);
+  const chk = await Promise.all(urls.map(u => fetch(u,{method:'HEAD'}).then(r=>r.ok).catch(()=>false)));
+  const [hp, hl, hv, ...tc] = chk;
+
+  const tb = tones.map((t, i) => {
+    const u = `${BASE}/assets/audio/tone_${letter}${i+1}.mp3`;
+    const ok = tc[i];
+    return `<button class="audio-btn tone" onclick="playAudio('${u}',this)" ${!ok?'style="opacity:0.4"':''}>
+      <span class="icon">🔊</span> ${TLABEL[i]} ${t}
+    </button>`;
+  }).join('');
+
+  const lb = letter === 've' ? 'üe' : letter;
+  return `<div class="card">
+    <div class="card-header">
+      <div class="letter-badge ${letter==='an'||letter==='en'||letter==='in'?'badge-an':'badge-ve'}">${lb}</div>
+      <div class="letter-info"><div class="letter-name">${lb}</div><div class="letter-pinyin">${PMAP[letter]}</div></div>
+    </div>
+    <div class="audio-row">
+      <button class="audio-btn" onclick="playAudio('${pU}',this)" ${!hp?'style="opacity:0.4"':''}><span class="icon">🔊</span> 主发音</button>
+      <button class="audio-btn" onclick="playAudio('${lU}',this)" ${!hl?'style="opacity:0.4"':''}><span class="icon">🔈</span> 慢读</button>
+    </div>
+    <div class="tone-row">${tb}</div>
+    <div class="video-wrap">${hv?`<video src="${vU}" controls playsinline preload="metadata"></video>`:'<div style="height:200px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4)">⚠️ 视频不存在</div>'}</div>
+  </div>`;
+}
+
+(async() => {
+  let ok = 0, fail = 0;
+  const all = [...G1, ...G2];
+
+  document.getElementById('grid1').innerHTML = (await Promise.all(G1.map((l,i) => buildCard(l,TONES[i])))).join('');
+  document.getElementById('grid2').innerHTML = (await Promise.all(G2.map((l,i) => buildCard(l,TONES[i+3])))).join('');
+
+  for (const l of all) {
+    const urls = [`${BASE}/assets/audio/pinyin_${l}.mp3`,`${BASE}/assets/audio/letter_${l}.mp3`,`${BASE}/assets/video/mouth_${l}.mp4`];
+    for (let i = 1; i <= 4; i++) urls.push(`${BASE}/assets/audio/tone_${l}${i}.mp3`);
+    const r = await Promise.all(urls.map(u => fetch(u,{method:'HEAD'}).then(r=>r.ok).catch(()=>false)));
+    if (r.every(Boolean)) ok++; else fail++;
+  }
+  document.getElementById('summary').innerHTML = `✅ ${ok}/6 完整（主发音+慢读+口型视频+四声调齐全）${fail>0?`<br>⚠️ ${fail} 个有缺失`:''}`;
+})();
+</script>
+</body>
+</html>

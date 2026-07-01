@@ -111,6 +111,9 @@ const TONE_AUDIO_MAP: Record<string, string> = {
   'ān': 'tone_an1', 'án': 'tone_an2', 'ǎn': 'tone_an3', 'àn': 'tone_an4',
   'ēn': 'tone_en1', 'én': 'tone_en2', 'ěn': 'tone_en3', 'èn': 'tone_en4',
   'īn': 'tone_in1', 'ín': 'tone_in2', 'ǐn': 'tone_in3', 'ìn': 'tone_in4',
+  // 鼻韵母四声（第15集）
+  'ūn': 'tone_un1', 'ún': 'tone_un2', 'ǔn': 'tone_un3', 'ùn': 'tone_un4',
+  'ǖn': 'tone_vn1', 'ǘn': 'tone_vn2', 'ǚn': 'tone_vn3', 'ǜn': 'tone_vn4',
 };
 
 // 游戏音频映射
@@ -184,7 +187,7 @@ const LETTER_TTS_FALLBACK: Record<string, string> = {
 };
 
 // 音频缓存版本号 — 音频文件更新时手动递增，强制浏览器重新下载
-export const AUDIO_CACHE_VERSION = 11;
+export const AUDIO_CACHE_VERSION = 12;
 
 /**
  * 获取视频文件路径
@@ -223,6 +226,7 @@ const MOUTH_VIDEO_MAP: Record<string, string> = {
   'ao': 'mouth_ao', 'ou': 'mouth_ou', 'iu': 'mouth_iu',
   'ie': 'mouth_ie', 've': 'mouth_ve', 'er': 'mouth_er',
   'an': 'mouth_an', 'en': 'mouth_en', 'in': 'mouth_in',
+  'un': 'mouth_un', 'vn': 'mouth_vn',
 };
 
 /**
