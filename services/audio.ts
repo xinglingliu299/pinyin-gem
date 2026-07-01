@@ -103,6 +103,10 @@ const TONE_AUDIO_MAP: Record<string, string> = {
   'āo': 'tone_ao1', 'áo': 'tone_ao2', 'ǎo': 'tone_ao3', 'ào': 'tone_ao4',
   'ōu': 'tone_ou1', 'óu': 'tone_ou2', 'ǒu': 'tone_ou3', 'òu': 'tone_ou4',
   'iū': 'tone_iu1', 'iú': 'tone_iu2', 'iǔ': 'tone_iu3', 'iù': 'tone_iu4',
+  // 复韵母四声（第13集提取）
+  'iē': 'tone_ie1', 'ié': 'tone_ie2', 'iě': 'tone_ie3', 'iè': 'tone_ie4',
+  'üē': 'tone_ve1', 'üé': 'tone_ve2', 'üě': 'tone_ve3', 'üè': 'tone_ve4',
+  'ēr': 'tone_er1', 'ér': 'tone_er2', 'ěr': 'tone_er3', 'èr': 'tone_er4',
 };
 
 // 游戏音频映射
@@ -176,7 +180,7 @@ const LETTER_TTS_FALLBACK: Record<string, string> = {
 };
 
 // 音频缓存版本号 — 音频文件更新时手动递增，强制浏览器重新下载
-export const AUDIO_CACHE_VERSION = 9;
+export const AUDIO_CACHE_VERSION = 10;
 
 /**
  * 获取视频文件路径
@@ -213,6 +217,7 @@ const MOUTH_VIDEO_MAP: Record<string, string> = {
   'y': 'mouth_y', 'w': 'mouth_w',
   'ai': 'mouth_ai', 'ei': 'mouth_ei', 'ui': 'mouth_ui',
   'ao': 'mouth_ao', 'ou': 'mouth_ou', 'iu': 'mouth_iu',
+  'ie': 'mouth_ie', 've': 'mouth_ve', 'er': 'mouth_er',
 };
 
 /**
